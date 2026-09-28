@@ -1,0 +1,59 @@
+#의존성 설치
+python3 -m pip install \
+numpy==1.26.4 \
+ultralytics==8.4.164 \
+opencv-python==4.10.0.84
+
+
+# 개별 노드 실행
+## 비디오 실행(샘플비디오를 ros2_ws폴더에 넣습니다)
+-터미널1(카메라노드)
+colcon build
+source install/setup.bash
+ros2 run yolo_detector camera_node --ros-args -p video_source:=비디오이름.mp4
+
+-터미널2(yolo모델 처리)
+source install/setup.bash
+ros2 run yolo_detector yolo_node
+
+-터미널3(시각화)
+source install/setup.bash
+ros2 run yolo_detector visualization_node
+
+
+## 웹캠 실행
+- 터미널1(카메라노드)
+colcon build
+source install/setup.bash
+ros2 run yolo_detector camera_node
+
+-터미널2(yolo모델 처리)
+source install/setup.bash
+ros2 run yolo_detector yolo_node
+
+-터미널3(시각화)
+source install/setup.bash
+ros2 run yolo_detector visualization_node
+
+
+#통합런치
+## 캠
+ros2 launch yolo_detector yolo_detection_launch
+
+## 비디오
+ros2 launch yolo_detector yolo_detection_launch.py video_source:="'/home/hkit/future/ros2_ws/비디오이름.mp4'"
+
+
+# 토픽확인
+-토픽 목록 확인
+ros2 topic list
+
+-검출 결과 확인 (JSON)
+ros2 topic echo /yolo/detections_json
+
+-검출 결과 확인 (Detection2DArray)
+ros2 topic echo /yolo/detections
+
+-토픽 발행 빈도 확인
+ros2 topic hz /camera/image_raw
+ros2 topic hz /yolo/detections

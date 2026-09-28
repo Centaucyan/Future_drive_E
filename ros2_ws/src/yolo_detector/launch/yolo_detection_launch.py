@@ -1,0 +1,95 @@
+#!/usr/bin/env python3
+"""
+YOLO 객체 검출 시스템 런치 파일
+- camera_node: 카메라/영상에서 프레임 캡처 → /camera/image_raw 발행
+- yolo_node: /camera/image_raw 구독 → YOLO 검출 → /yolo/detections 발행
+- visualization_node: /yolo/result_image 구독 → 결과 시각화
+"""
+
+from launch import LaunchDescription
+from launch.actions import DeclareLaunchArgument
+from launch.substitutions import LaunchConfiguration
+from launch_ros.actions import Node
+
+
+def generate_launch_description():
+
+    # ── 런치 인자 선언 ──
+    video_source_arg = DeclareLaunchArgument(
+        'video_source',
+        default_value="'0'",
+        description='비디오 소스: 0=웹캠, 또는 영상 파일 경로'
+    )
+
+    model_name_arg = DeclareLaunchArgument(
+        'model_name',
+        default_value='yolov8n.pt',
+        description='YOLO 모델 이름 (yolov8n.pt, yolov8s.pt, yolov8m.pt 등)'
+    )
+
+    confidence_arg = DeclareLaunchArgument(
+        'confidence',
+        default_value='0.5',
+        description='검출 신뢰도 임계값 (0.0 ~ 1.0)'
+    )
+
+    frame_rate_arg = DeclareLaunchArgument(
+        'frame_rate',
+        default_value='30.0',
+        description='카메라 프레임 레이트 (Hz)'
+    )
+
+    device_arg = DeclareLaunchArgument(
+        'device',
+        default_value='cpu',
+        description='추론 디바이스: cpu 또는 cuda'
+    )
+
+    # ── 노드 정의 ──
+    camera_node = Node(
+        package='yolo_detector',
+        executable='camera_node',
+        name='camera_publisher',
+        output='screen',
+        parameters=[{
+            'video_source': LaunchConfiguration('video_source'),
+            'frame_rate': LaunchConfiguration('frame_rate'),
+            'frame_width': 640,
+            'frame_height': 480,
+            'loop_video': True,
+        }],
+    )
+
+    yolo_node = Node(
+        package='yolo_detector',
+        executable='yolo_node',
+        name='yolo_detector',
+        output='screen',
+        parameters=[{
+            'model_name': LaunchConfiguration('model_name'),
+            'confidence_threshold': LaunchConfiguration('confidence'),
+            'device': LaunchConfiguration('device'),
+            'input_topic': '/camera/image_raw',
+            'max_det': 50,
+        }],
+    )
+
+    visualization_node = Node(
+        package='yolo_detector',
+        executable='visualization_node',
+        name='visualization_node',
+        output='screen',
+    )
+
+    return LaunchDescription([
+        # 런치 인자
+        video_source_arg,
+        model_name_arg,
+        confidence_arg,
+        frame_rate_arg,
+        device_arg,
+        # 노드
+        camera_node,
+        yolo_node,
+        visualization_node,
+    ])
