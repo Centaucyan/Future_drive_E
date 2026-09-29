@@ -23,7 +23,7 @@ def generate_launch_description():
 
     model_name_arg = DeclareLaunchArgument(
         'model_name',
-        default_value='yolov8n.pt',
+        default_value='models/yolov8n.pt',
         description='YOLO 모델 이름 (yolov8n.pt, yolov8s.pt, yolov8m.pt 등)'
     )
 

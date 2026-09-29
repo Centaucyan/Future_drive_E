@@ -41,7 +41,7 @@ ros2 run yolo_detector visualization_node
 ros2 launch yolo_detector yolo_detection_launch
 
 ## 비디오
-ros2 launch yolo_detector yolo_detection_launch.py video_source:="'/home/hkit/future/ros2_ws/비디오이름.mp4'"
+ros2 launch yolo_detector yolo_detection_launch.py video_source:=비디오이름.mp4
 
 
 # 토픽확인
