@@ -1,6 +1,7 @@
 # Future_drive Project(모빌리티 E)
 
-## 팀원
+## 지도 강사 및 팀원
+* **지도강사:** 박승휘
 * **반장:** 권동재
 * **부반장:** 김태형
 * **AP:** 김동규, 정원혁
@@ -9,7 +10,7 @@
 
 ## Git commit message prefix rule
 * [feature] 기능 추가 및 개선
-* [fix] 오류 해결
+* [bugfix] 오류 해결
 * [ignore] 기능 동작에 영향 없는 문서 파일
 * [test] 기능 테스트를 위한 commit
 ---
