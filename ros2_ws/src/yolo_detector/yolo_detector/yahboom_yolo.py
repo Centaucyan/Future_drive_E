@@ -8,11 +8,12 @@ YOLO 객체 검출 노드
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from vision_msgs.msg import Detection2DArray, Detection2D, ObjectHypothesisWithPose
 from std_msgs.msg import String
 from cv_bridge import CvBridge
 from ultralytics import YOLO
+import numpy as np
 import cv2
 import json
 import time
@@ -56,7 +57,7 @@ class YoloDetector(Node):
 
         # ── 구독자: 카메라 이미지 ──
         self.subscription = self.create_subscription(
-            Image,
+            CompressedImage,
             input_topic,
             self.image_callback,
             10
@@ -96,8 +97,12 @@ class YoloDetector(Node):
     def image_callback(self, msg: Image):
         """카메라 이미지 수신 시 YOLO 추론 수행"""
         try:
-            # ROS2 Image → OpenCV 이미지 변환
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+            np_arr = np.frombuffer(msg.data, np.uint8)
+            cv_image = cv2.imdecode(np_arr, cv2.IMREAD_COLOR)
+
+            if cv_image is None:
+                self.get_logger().error("❌ CompressedImage 디코딩 실패")
+                return
         except Exception as e:
             self.get_logger().error(f'❌ 이미지 변환 실패: {e}')
             return
