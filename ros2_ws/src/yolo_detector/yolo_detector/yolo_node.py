@@ -25,9 +25,14 @@ class YoloDetector(Node):
         super().__init__('yolo_detector')
 
         # ── 파라미터 선언 ──
-        self.declare_parameter('video_source', '0')     # 웹캠 인덱스 또는 영상 파일 경로
-        self.declare_parameter('model_name', 'models/futuredrive_yolo26n_aug_v1_best.pt')   # YOLO 학습모델 사용시 모델명 변경
+        self.declare_parameter('model_name', 'models/futuredrive_yolo26n_hardneg_v2_best.pt')   # YOLO 학습모델 사용시 모델명 변경
         self.declare_parameter('confidence_threshold', 0.5)     # 신뢰도 임계값
+        self.declare_parameter('four_wheeler_confidence', 0.45)
+        self.declare_parameter('two_wheeler_confidence', 0.25)
+        self.declare_parameter('person_confidence', 0.30)
+        self.declare_parameter('confirmation_frames', 2)
+        self.declare_parameter('max_missed_frames', 2)
+        self.declare_parameter('temporal_iou_threshold', 0.3)
         self.declare_parameter('device', 'cpu')                 # 'cpu' 또는 'cuda'
         self.declare_parameter('input_topic', '/camera/image_raw')
         self.declare_parameter('max_det', 50)                   # 최대 검출 수
@@ -35,16 +40,17 @@ class YoloDetector(Node):
         # 파라미터 값 가져오기
         model_name = self.get_parameter('model_name').get_parameter_value().string_value
         self.conf_threshold = self.get_parameter('confidence_threshold').get_parameter_value().double_value
+        self.class_thresholds = {
+            0: self.get_parameter('four_wheeler_confidence').value,
+            1: self.get_parameter('two_wheeler_confidence').value,
+            2: self.get_parameter('person_confidence').value,
+        }
+        self.confirmation_frames = self.get_parameter('confirmation_frames').value
+        self.max_missed_frames = self.get_parameter('max_missed_frames').value
+        self.temporal_iou_threshold = self.get_parameter('temporal_iou_threshold').value
         device = self.get_parameter('device').get_parameter_value().string_value
         input_topic = self.get_parameter('input_topic').get_parameter_value().string_value
         self.max_det = self.get_parameter('max_det').get_parameter_value().integer_value
-        video_source = self.get_parameter('video_source').value
-
-        if str(video_source).isdigit():
-            video_source = int(video_source)
-
-        self.cap = cv2.VideoCapture(video_source)
-
         # ── YOLO 모델 로드 ──
         self.get_logger().info(f'🔄 YOLO 모델 로딩 중: {model_name}')
         self.model = YOLO(model_name)
@@ -59,7 +65,7 @@ class YoloDetector(Node):
             Image,
             input_topic,
             self.image_callback,
-            10
+            1
         )
         self.get_logger().info(f'📥 구독 토픽: {input_topic}')
 
@@ -90,8 +96,15 @@ class YoloDetector(Node):
         # ── 통계 ──
         self.inference_count = 0
         self.total_inference_time = 0.0
+        self.temporal_tracks = []
 
         self.get_logger().info('🚀 YoloDetector 노드 시작!')
+        self.get_logger().info(
+            '🎯 클래스별 임계값: '
+            f'four_wheeler={self.class_thresholds[0]:.2f}, '
+            f'two_wheeler={self.class_thresholds[1]:.2f}, '
+            f'person={self.class_thresholds[2]:.2f}'
+        )
 
     def image_callback(self, msg: Image):
         """카메라 이미지 수신 시 YOLO 추론 수행"""
@@ -106,7 +119,8 @@ class YoloDetector(Node):
         start_time = time.time()
         results = self.model(
             cv_image,
-            conf=self.conf_threshold,
+            # 클래스별 후처리를 위해 가장 낮은 임계값 이상의 후보를 받는다.
+            conf=min(self.class_thresholds.values()),
             max_det=self.max_det,
             verbose=False
         )
@@ -129,74 +143,97 @@ class YoloDetector(Node):
         # 3) 시각화를 위한 이미지 복사
         annotated_image = cv_image.copy()
 
+        frame_detections = []
         if boxes is not None and len(boxes) > 0:
             for box in boxes:
                 # 바운딩 박스 좌표 (xyxy → center + size)
                 x1, y1, x2, y2 = box.xyxy[0].cpu().numpy()
-                cx = (x1 + x2) / 2.0
-                cy = (y1 + y2) / 2.0
-                w = x2 - x1
-                h = y2 - y1
-
                 confidence = float(box.conf[0].cpu().numpy())
                 class_id = int(box.cls[0].cpu().numpy())
                 class_name = self.model.names[class_id]
 
-                # Detection2D 메시지 구성
-                detection = Detection2D()
-                detection.bbox.center.position.x = float(cx)
-                detection.bbox.center.position.y = float(cy)
-                detection.bbox.size_x = float(w)
-                detection.bbox.size_y = float(h)
+                class_threshold = self.class_thresholds.get(
+                    class_id, self.conf_threshold
+                )
+                if confidence < class_threshold:
+                    continue
 
-                hypothesis = ObjectHypothesisWithPose()
-                hypothesis.hypothesis.class_id = str(class_id)
-                hypothesis.hypothesis.score = confidence
-                detection.results.append(hypothesis)
-
-                detection_array_msg.detections.append(detection)
-
-                # JSON 결과 추가
-                json_detections.append({
+                frame_detections.append({
                     'class_id': class_id,
                     'class_name': class_name,
-                    'confidence': round(confidence, 3),
-                    'bbox': {
-                        'x1': round(float(x1), 1),
-                        'y1': round(float(y1), 1),
-                        'x2': round(float(x2), 1),
-                        'y2': round(float(y2), 1),
-                    },
-                    'center': {
-                        'x': round(float(cx), 1),
-                        'y': round(float(cy), 1),
-                    }
+                    'confidence': confidence,
+                    'bbox': [float(x1), float(y1), float(x2), float(y2)],
                 })
 
-                # ── 시각화: 바운딩 박스 + 라벨 그리기 ──
-                color = self._get_color(class_id)
-                cv2.rectangle(
-                    annotated_image,
-                    (int(x1), int(y1)),
-                    (int(x2), int(y2)),
-                    color, 2
-                )
+        stable_detections = self._update_temporal_tracks(frame_detections)
 
-                label = f'{class_name} {confidence:.2f}'
-                label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                cv2.rectangle(
-                    annotated_image,
-                    (int(x1), int(y1) - label_size[1] - 10),
-                    (int(x1) + label_size[0], int(y1)),
-                    color, -1
-                )
-                cv2.putText(
-                    annotated_image,
-                    label,
-                    (int(x1), int(y1) - 5),
-                    cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6, (255, 255, 255), 2
-                )
+        for item in stable_detections:
+            x1, y1, x2, y2 = item['bbox']
+            confidence = item['confidence']
+            class_id = item['class_id']
+            class_name = item['class_name']
+            cx = (x1 + x2) / 2.0
+            cy = (y1 + y2) / 2.0
+            w = x2 - x1
+            h = y2 - y1
+
+            # Detection2D 메시지 구성
+            detection = Detection2D()
+            detection.bbox.center.position.x = float(cx)
+            detection.bbox.center.position.y = float(cy)
+            detection.bbox.size_x = float(w)
+            detection.bbox.size_y = float(h)
+
+            hypothesis = ObjectHypothesisWithPose()
+            hypothesis.hypothesis.class_id = str(class_id)
+            hypothesis.hypothesis.score = confidence
+            detection.results.append(hypothesis)
+
+            detection_array_msg.detections.append(detection)
+
+            # JSON 결과 추가
+            json_detections.append({
+                'class_id': class_id,
+                'class_name': class_name,
+                'confidence': round(confidence, 3),
+                'bbox': {
+                    'x1': round(float(x1), 1),
+                    'y1': round(float(y1), 1),
+                    'x2': round(float(x2), 1),
+                    'y2': round(float(y2), 1),
+                },
+                'center': {
+                    'x': round(float(cx), 1),
+                    'y': round(float(cy), 1),
+                }
+            })
+
+            # ── 시각화: 바운딩 박스 + 라벨 그리기 ──
+            color = self._get_color(class_id)
+            cv2.rectangle(
+                annotated_image,
+                (int(x1), int(y1)),
+                (int(x2), int(y2)),
+                color, 2
+            )
+
+            label = f'{class_name} {confidence:.2f}'
+            label_size, _ = cv2.getTextSize(
+                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+            )
+            cv2.rectangle(
+                annotated_image,
+                (int(x1), int(y1) - label_size[1] - 10),
+                (int(x1) + label_size[0], int(y1)),
+                color, -1
+            )
+            cv2.putText(
+                annotated_image,
+                label,
+                (int(x1), int(y1) - 5),
+                cv2.FONT_HERSHEY_SIMPLEX,
+                0.6, (255, 255, 255), 2
+            )
 
         # ── FPS 정보 표시 ──
         fps = 1.0 / inference_time if inference_time > 0 else 0
@@ -251,6 +288,61 @@ class YoloDetector(Node):
             (255, 128, 128), (128, 255, 128),
         ]
         return colors[class_id % len(colors)]
+
+    @staticmethod
+    def _bbox_iou(box_a, box_b):
+        """두 xyxy 바운딩 박스의 IoU를 계산한다."""
+        ax1, ay1, ax2, ay2 = box_a
+        bx1, by1, bx2, by2 = box_b
+        ix1, iy1 = max(ax1, bx1), max(ay1, by1)
+        ix2, iy2 = min(ax2, bx2), min(ay2, by2)
+        intersection = max(0.0, ix2 - ix1) * max(0.0, iy2 - iy1)
+        area_a = max(0.0, ax2 - ax1) * max(0.0, ay2 - ay1)
+        area_b = max(0.0, bx2 - bx1) * max(0.0, by2 - by1)
+        union = area_a + area_b - intersection
+        return intersection / union if union > 0.0 else 0.0
+
+    def _update_temporal_tracks(self, detections):
+        """연속 프레임 확인으로 순간 오검출과 짧은 검출 누락을 완화한다."""
+        unmatched_tracks = set(range(len(self.temporal_tracks)))
+
+        for detection in detections:
+            best_index = None
+            best_iou = self.temporal_iou_threshold
+            for index in unmatched_tracks:
+                track = self.temporal_tracks[index]
+                if track['class_id'] != detection['class_id']:
+                    continue
+                iou = self._bbox_iou(track['bbox'], detection['bbox'])
+                if iou >= best_iou:
+                    best_iou = iou
+                    best_index = index
+
+            if best_index is None:
+                self.temporal_tracks.append({
+                    **detection,
+                    'hits': 1,
+                    'missed': 0,
+                })
+                continue
+
+            track = self.temporal_tracks[best_index]
+            track.update(detection)
+            track['hits'] += 1
+            track['missed'] = 0
+            unmatched_tracks.remove(best_index)
+
+        for index in unmatched_tracks:
+            self.temporal_tracks[index]['missed'] += 1
+
+        self.temporal_tracks = [
+            track for track in self.temporal_tracks
+            if track['missed'] <= self.max_missed_frames
+        ]
+        return [
+            track for track in self.temporal_tracks
+            if track['hits'] >= self.confirmation_frames
+        ]
 
 
 def main(args=None):

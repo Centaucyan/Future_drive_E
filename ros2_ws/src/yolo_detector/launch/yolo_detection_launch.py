@@ -23,14 +23,8 @@ def generate_launch_description():
 
     model_name_arg = DeclareLaunchArgument(
         'model_name',
-        default_value='models/futuredrive_yolo26n_aug_v1_best.pt',
+        default_value='models/futuredrive_yolo26n_hardneg_v2_best.pt',
         description='YOLO 모델 이름 (yolov8n.pt, yolov8s.pt, yolov8m.pt 등)'
-    )
-
-    confidence_arg = DeclareLaunchArgument(
-        'confidence',
-        default_value='0.25',
-        description='검출 신뢰도 임계값 (0.0 ~ 1.0)'
     )
 
     frame_rate_arg = DeclareLaunchArgument(
@@ -67,7 +61,12 @@ def generate_launch_description():
         output='screen',
         parameters=[{
             'model_name': LaunchConfiguration('model_name'),
-            'confidence_threshold': LaunchConfiguration('confidence'),
+            'four_wheeler_confidence': 0.75,
+            'two_wheeler_confidence': 0.30,
+            'person_confidence': 0.30,
+            'confirmation_frames': 2,
+            'max_missed_frames': 2,
+            'temporal_iou_threshold': 0.3,
             'device': LaunchConfiguration('device'),
             'input_topic': '/camera/image_raw',
             'max_det': 50,
@@ -85,7 +84,6 @@ def generate_launch_description():
         # 런치 인자
         video_source_arg,
         model_name_arg,
-        confidence_arg,
         frame_rate_arg,
         device_arg,
         # 노드
