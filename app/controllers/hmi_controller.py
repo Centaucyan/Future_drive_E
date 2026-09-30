@@ -4,11 +4,17 @@ from pathlib import Path
 
 from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
+from app.models.image_stream_model import image_stream_model
+from app.models.yahboom_yolo import YoloDetector
+from fastapi.templating import Jinja2Templates
 
 # 기존 HMI의 경로와 응답 형식을 유지합니다.
 router = APIRouter()
 BASE_DIR = Path(__file__).resolve().parents[1]
 
+templates = Jinja2Templates(
+    directory="app/views"
+)
 
 # 4. HMI 메인 화면 제공
 @router.get("/")
@@ -31,6 +37,34 @@ async def detections(request: Request):
         "detections": items
     }
 
+@router.get("/image")
+async def image_page(request: Request):
+    """
+    이미지 스트리밍 화면
+    """
+    return templates.TemplateResponse(
+        request=request,
+        name="image_stream.html",
+        context={
+            "title": "Image Raw Stream",
+        },
+    )
+
+@router.get("/image/stream")
+async def image_stream():
+    """
+    MJPEG 스트리밍 endpoint
+    """
+
+    return StreamingResponse(
+        image_stream_model.generate_mjpeg(),
+        media_type="multipart/x-mixed-replace; boundary=frame",
+        headers={
+            "Cache-Control": "no-cache, no-store, must-revalidate",
+            "Pragma": "no-cache",
+            "Expires": "0",
+        },
+    )
 
 # 6. 카메라 JPEG 영상을 MJPEG 스트림으로 제공
 @router.get("/api/cam-stream")

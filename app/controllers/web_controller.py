@@ -6,6 +6,7 @@ def create_router(get_ros_model):
     """서버가 제공하는 모델 조회 함수를 받아 요청마다 모델을 주입합니다."""
     router = APIRouter()
 
+
     # 전체 긴급정지 버튼 - ROS2 통신 테스트 모드
     @router.post("/api/master-emergency-stop")
     async def emergency_stop(ros_model=Depends(get_ros_model)):

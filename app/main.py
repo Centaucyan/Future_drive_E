@@ -2,21 +2,23 @@
 
 # 1. 서버 실행 및 HTTP 응답 모듈
 import asyncio
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
-from threading import Event, Thread
+from threading import Thread
 
 from fastapi import FastAPI, Request
 from fastapi.staticfiles import StaticFiles
 
 # ROS2 통신 모듈 (테스트용)
 import rclpy
+from rclpy.executors import SingleThreadedExecutor
 from app.models.ap_ros_model import HMIControlModel
-from app.controllers import hmi_controller, control_controller
+from app.controllers import hmi_controller, web_controller
+from app.controllers.ros_decet import SPVisionReceiver
+from app.models.image_stream_model import image_stream_model
 
 # YOLO 처리 및 인식 결과 저장 모델
-from app.models.model_load import VisionState, run_yolo_loop
+from app.models.model_load import VisionState
 
 # HTML·CSS·JS 파일을 찾기 위한 app 폴더 경로
 BASE_DIR = Path(__file__).resolve().parent
@@ -33,30 +35,34 @@ async def lifespan(application):
     rclpy.init()
 
     ros_node = None
-    stop = Event()
-    worker = None
+    sp_receiver = None
+    executor = None
+    spin_thread = None
+
+    
+
 
     try:
         # 실제 ROS2 제어 모델을 생성하고 Controller에 전달합니다.
         ros_node = HMIControlModel()
         application.state.ros_model = ros_node
+        image_stream_model.start()
 
         print(
             "[ROS2] Publisher initialized: /ap_test/control/request",
             flush=True
         )
 
-        # ------------------------------------------
-        # 기존 선택적 로컬 YOLO 실행
-        # ------------------------------------------
+        # 웹 API와 동일한 상태 객체를 SP 수신 노드에 전달합니다.
+        sp_receiver = SPVisionReceiver(application.state.vision)
+        application.state.sp_receiver = sp_receiver
 
-        if os.getenv("HMI_LOCAL_VISION") == "1":
-            worker = Thread(
-                target=run_yolo_loop,
-                args=(application.state.vision, stop),
-                daemon=True
-            )
-            worker.start()
+        # 두 노드를 함께 spin합니다. 수신 콜백은 순차 실행되어 최신 값끼리 덮어쓰지 않습니다.
+        executor = SingleThreadedExecutor()
+        executor.add_node(ros_node)
+        executor.add_node(sp_receiver)
+        spin_thread = Thread(target=executor.spin, daemon=True)
+        spin_thread.start()
 
         # 서버 실행 유지
         yield
@@ -66,10 +72,13 @@ async def lifespan(application):
         # 서버 종료 시 자원 정리
         # ------------------------------------------
 
-        stop.set()
-
-        if worker is not None:
-            await asyncio.to_thread(worker.join, 3)
+        # 콜백 실행을 먼저 끝내고 노드를 해제하여 종료 중 접근을 방지합니다.
+        if executor is not None:
+            await asyncio.to_thread(executor.shutdown)
+        if spin_thread is not None:
+            await asyncio.to_thread(spin_thread.join)
+        if sp_receiver is not None:
+            sp_receiver.destroy_node()
 
         # ROS2 노드 종료
         if ros_node is not None:
@@ -78,13 +87,14 @@ async def lifespan(application):
         if rclpy.ok():
             rclpy.shutdown()
 
+        image_stream_model.stop()
         print("[ROS2] Test publisher shutdown", flush=True)
 
 
 # 3. FastAPI 앱 생성 및 공용 인식 상태 연결
 app = FastAPI(lifespan=lifespan)
 
-# 향후 SP 수신 코드도 이 인스턴스의 update()로 결과를 전달합니다.
+# SP 수신 노드와 HMI API가 이 인스턴스 하나를 공유합니다.
 app.state.vision = VisionState()
 
 # 브라우저에서 사용하는 CSS·JS 정적 파일 제공
@@ -104,4 +114,4 @@ async def get_ros_model(request: Request):
     return request.app.state.ros_model
 
 
-app.include_router(control_controller.create_router(get_ros_model))
+app.include_router(web_controller.create_router(get_ros_model))
