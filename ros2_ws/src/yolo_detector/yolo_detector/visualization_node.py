@@ -79,7 +79,7 @@ class VisualizationNode(Node):
 
     def lane_callback(self, msg):
         if msg.data[0] > 0.5:
-        self.lane_data=msg.data
+            self.lane_data=msg.data
 
     def destroy_node(self):
         cv2.destroyAllWindows()
