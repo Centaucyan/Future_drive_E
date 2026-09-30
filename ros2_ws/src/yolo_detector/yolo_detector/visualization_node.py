@@ -8,10 +8,11 @@
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
-from std_msgs.msg import String
+from std_msgs.msg import String, Float32MultiArray
 from cv_bridge import CvBridge
 import cv2
 import json
+import numpy as np
 
 
 class VisualizationNode(Node):
@@ -21,6 +22,8 @@ class VisualizationNode(Node):
         super().__init__('visualization_node')
 
         self.bridge = CvBridge()
+
+        self.lane_data=None
 
         # ── 구독자: 검출 결과 이미지 ──
         self.image_sub = self.create_subscription(
@@ -38,17 +41,51 @@ class VisualizationNode(Node):
             10
         )
 
+        # ── 구독자: 차선 검출 결과 ──
+        self.lane_sub = self.create_subscription(
+            Float32MultiArray,
+            '/lane/result',
+            self.lane_callback,
+            10
+        )
+
         self.get_logger().info('🖥️  VisualizationNode 시작 - 결과 시각화 중...')
 
-    def image_callback(self, msg: Image):
-        """검출 결과 이미지 수신 및 화면 표시"""
+    def image_callback(self,msg: Image):
+        """YOLO 검출 결과 이미지에 차선 표시"""
         try:
-            cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-            cv2.imshow('YOLO Detection Result', cv_image)
-            key = cv2.waitKey(1) & 0xFF
+            cv_image=self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+
+            if self.lane_data is not None and self.lane_data[0] > 0.5:
+                left_points=[]
+                right_points=[]
+
+                # [valid, center, offset, left_bottom, right_bottom] 이후 차선 좌표
+                for i in range(20):
+                    j=5+i*4
+                    left_points.append([
+                        int(self.lane_data[j]),
+                        int(self.lane_data[j+1])
+                    ])
+                    right_points.append([
+                        int(self.lane_data[j+2]),
+                        int(self.lane_data[j+3])
+                    ])
+
+                cv2.polylines(
+                    cv_image,[np.array(left_points)],
+                    False,(0,255,0),3
+                )
+                cv2.polylines(
+                    cv_image,[np.array(right_points)],
+                    False,(0,255,0),3
+                )
+
+            cv2.imshow('YOLO Detection Result',cv_image)
+            key=cv2.waitKey(1)&0xFF
 
             # 'q' 키를 누르면 종료
-            if key == ord('q'):
+            if key==ord('q'):
                 self.get_logger().info('🛑 사용자가 종료를 요청했습니다.')
                 rclpy.shutdown()
 
@@ -70,6 +107,9 @@ class VisualizationNode(Node):
                 )
         except Exception as e:
             self.get_logger().error(f'❌ JSON 파싱 오류: {e}')
+
+    def lane_callback(self, msg):
+        self.lane_data=msg.data
 
     def destroy_node(self):
         cv2.destroyAllWindows()

@@ -23,13 +23,13 @@ def generate_launch_description():
 
     model_name_arg = DeclareLaunchArgument(
         'model_name',
-        default_value='models/yolov8n.pt',
+        default_value='models/futuredrive_yolo26n_aug_v1_best.pt',
         description='YOLO 모델 이름 (yolov8n.pt, yolov8s.pt, yolov8m.pt 등)'
     )
 
     confidence_arg = DeclareLaunchArgument(
         'confidence',
-        default_value='0.5',
+        default_value='0.25',
         description='검출 신뢰도 임계값 (0.0 ~ 1.0)'
     )
 

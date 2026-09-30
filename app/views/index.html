@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="ko">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <title>ROS2 FastAPI Web</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', path='/css/style.css') }}"
+    >
+</head>
+
+<body>
+
+    <div class="container">
+
+        <h1>ROS2 + FastAPI</h1>
+
+        <p class="description">
+            ROS2 Topic Message
+        </p>
+
+        <div class="message-box">
+
+            <span class="label">
+                /web_message
+            </span>
+
+            <p class="message">
+                {{ message }}
+            </p>
+
+        </div>
+
+        <button id="refreshButton">
+            새로고침
+        </button>
+
+    </div>
+
+    <script src="{{ url_for('static', path='/js/main.js') }}"></script>
+
+</body>
+
+</html>
