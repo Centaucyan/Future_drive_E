@@ -8,7 +8,7 @@ YOLO 객체 검출 노드
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CameraInfo
 from vision_msgs.msg import Detection2DArray, Detection2D, ObjectHypothesisWithPose
 from std_msgs.msg import String
 from cv_bridge import CvBridge
@@ -16,10 +16,11 @@ from ultralytics import YOLO
 import cv2
 import json
 import time
+import math
 
 
 class YoloDetector(Node):
-    """YOLO 모델을 이용한 실시간 객체 검출 ROS2 노드"""
+    """YOLO 모델을 이용한 실시간 객체 검출 및 단안 거리 추정 ROS2 노드"""
 
     def __init__(self):
         super().__init__('yolo_detector')
@@ -35,7 +36,28 @@ class YoloDetector(Node):
         self.declare_parameter('temporal_iou_threshold', 0.3)
         self.declare_parameter('device', 'cpu')                 # 'cpu' 또는 'cuda'
         self.declare_parameter('input_topic', '/camera/image_raw')
+        self.declare_parameter('camera_info_topic', '/camera/camera_info')
         self.declare_parameter('max_det', 50)                   # 최대 검출 수
+
+        # ── 단안 거리 추정 파라미터 (단위: m, px, deg) ──
+        # 거리 측정 모드: 'ground' (바닥 접점 지면 투영) 또는 'bbox_height' (높이 기반)
+        self.declare_parameter('distance_method', 'ground')
+        # 카메라 지면 장착 높이 (지면에서 카메라 렌즈 중심까지의 수직 높이, m)
+        self.declare_parameter('camera_height', 1.4)
+        # 카메라 피치 각도 (수평=0도, 아래로 기울어졌으면 양수 값, 예: 5.0 = 아래로 5도 틸트)
+        self.declare_parameter('camera_pitch_deg', 3.0)
+        # 기본 초점 거리 및 주점 (640x480 해상도 기준 기본 fx/fy ~= 554 px, cx=320, cy=240)
+        self.declare_parameter('focal_length_y', 554.0)
+        self.declare_parameter('focal_length_x', 554.0)
+        self.declare_parameter('principal_point_x', 320.0)
+        self.declare_parameter('principal_point_y', 240.0)
+        # 클래스별 실제 물리적 높이 (0: 4륜, 1: 2륜, 2: 사람) - fallback 용도
+        self.declare_parameter('real_height_four_wheeler', 1.5)  # 4륜차 실제 높이 (m)
+        self.declare_parameter('real_height_two_wheeler', 1.2)   # 2륜차 실제 높이 (m)
+        self.declare_parameter('real_height_person', 1.7)        # 사람 실제 키 (m)
+        self.declare_parameter('min_distance', 0.1)              # 최소 유효 거리 (m)
+        self.declare_parameter('max_distance', 50.0)             # 최대 유효 거리 (m)
+        self.declare_parameter('distance_smoothing_alpha', 0.7)  # 거리 스무딩 계수 (최신값 가중치)
 
         # 파라미터 값 가져오기
         model_name = self.get_parameter('model_name').get_parameter_value().string_value
@@ -50,7 +72,25 @@ class YoloDetector(Node):
         self.temporal_iou_threshold = self.get_parameter('temporal_iou_threshold').value
         device = self.get_parameter('device').get_parameter_value().string_value
         input_topic = self.get_parameter('input_topic').get_parameter_value().string_value
+        camera_info_topic = self.get_parameter('camera_info_topic').get_parameter_value().string_value
         self.max_det = self.get_parameter('max_det').get_parameter_value().integer_value
+
+        self.distance_method = self.get_parameter('distance_method').get_parameter_value().string_value
+        self.camera_height = self.get_parameter('camera_height').get_parameter_value().double_value
+        self.camera_pitch_deg = self.get_parameter('camera_pitch_deg').get_parameter_value().double_value
+        self.fy = self.get_parameter('focal_length_y').get_parameter_value().double_value
+        self.fx = self.get_parameter('focal_length_x').get_parameter_value().double_value
+        self.cx = self.get_parameter('principal_point_x').get_parameter_value().double_value
+        self.cy = self.get_parameter('principal_point_y').get_parameter_value().double_value
+        self.real_heights = {
+            0: self.get_parameter('real_height_four_wheeler').get_parameter_value().double_value,
+            1: self.get_parameter('real_height_two_wheeler').get_parameter_value().double_value,
+            2: self.get_parameter('real_height_person').get_parameter_value().double_value,
+        }
+        self.min_dist = self.get_parameter('min_distance').get_parameter_value().double_value
+        self.max_dist = self.get_parameter('max_distance').get_parameter_value().double_value
+        self.distance_smoothing_alpha = self.get_parameter('distance_smoothing_alpha').get_parameter_value().double_value
+
         # ── YOLO 모델 로드 ──
         self.get_logger().info(f'🔄 YOLO 모델 로딩 중: {model_name}')
         self.model = YOLO(model_name)
@@ -68,6 +108,15 @@ class YoloDetector(Node):
             1
         )
         self.get_logger().info(f'📥 구독 토픽: {input_topic}')
+
+        # ── 구독자: 카메라 캘리브레이션 정보 (CameraInfo 수신 시 자동 초점거리/주점 갱신) ──
+        self.camera_info_sub = self.create_subscription(
+            CameraInfo,
+            camera_info_topic,
+            self.camera_info_callback,
+            10
+        )
+        self.has_camera_info = False
 
         # ── 퍼블리셔: 검출 결과 ──
         # 1) Detection2DArray (표준 vision_msgs 형식)
@@ -105,9 +154,62 @@ class YoloDetector(Node):
             f'two_wheeler={self.class_thresholds[1]:.2f}, '
             f'person={self.class_thresholds[2]:.2f}'
         )
+        self.get_logger().info(
+            f'📏 거리 추정 모드: {self.distance_method} '
+            f'(H_cam={self.camera_height:.2f}m, pitch={self.camera_pitch_deg:.1f}°, fy={self.fy:.1f}px)'
+        )
+
+    def camera_info_callback(self, msg: CameraInfo):
+        """CameraInfo 토픽 수신 시 초점거리 및 주점 파라미터 자동 갱신"""
+        if len(msg.k) >= 9:
+            fx = msg.k[0]
+            cx = msg.k[2]
+            fy = msg.k[4]
+            cy = msg.k[5]
+            if fx > 0.0 and fy > 0.0:
+                self.fx = float(fx)
+                self.fy = float(fy)
+                self.cx = float(cx)
+                self.cy = float(cy)
+                if not self.has_camera_info:
+                    self.get_logger().info(
+                        f'📷 CameraInfo 수신 완료: fx={self.fx:.1f}, fy={self.fy:.1f}, cx={self.cx:.1f}, cy={self.cy:.1f}'
+                    )
+                    self.has_camera_info = True
+
+    def estimate_distance(self, class_id: int, bbox: list) -> float:
+        """
+        거리 추정:
+        1. 바닥 접점 지면 투영 (Ground Plane Projection):
+           객체 바닥점 y2를 기준으로 지면과의 각도를 계산하여 거리 Z 산출
+           Z = Camera_Height / tan(pitch_angle + arctan((y2 - cy) / fy))
+        2. 지평선 위이거나 비정상 각도일 경우 Bbox 높이 기반 Pinhole 공식으로 안전하게 대체
+        """
+        x1, y1, x2, y2 = bbox
+        h_px = max(1.0, float(y2 - y1))
+        real_h = self.real_heights.get(class_id, 1.0)
+
+        distance = None
+
+        if self.distance_method == 'ground':
+            # 바닥 접점(y2)과 주점(cy) 사이의 수직 화각 각도(alpha)
+            pitch_rad = math.radians(self.camera_pitch_deg)
+            angle_alpha = math.atan((y2 - self.cy) / self.fy)
+            total_angle = pitch_rad + angle_alpha
+
+            # 바닥 접점이 지평선 아래에 있어 지면과 교차하는 경우 (약 0.5도 이상)
+            if total_angle > math.radians(0.5):
+                distance = self.camera_height / math.tan(total_angle)
+
+        # 지면 투영이 비활성화되었거나 각도가 유효하지 않은 경우 Bbox 높이 기반 fallback
+        if distance is None:
+            distance = (self.fy * real_h) / h_px
+
+        distance = max(self.min_dist, min(self.max_dist, distance))
+        return float(distance)
 
     def image_callback(self, msg: Image):
-        """카메라 이미지 수신 시 YOLO 추론 수행"""
+        """카메라 이미지 수신 시 YOLO 추론 및 거리 추정 수행"""
         try:
             # ROS2 Image → OpenCV 이미지 변환
             cv_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -154,6 +256,18 @@ class YoloDetector(Node):
         box_thickness = 1
         padding = 3
 
+        image_height, image_width = annotated_image.shape[:2]
+
+        display_class_names = {
+            'four_wheeler': '4wheel',
+            'two_wheeler': '2wheel',
+            'person': 'person',
+        }
+        font_scale = 0.4
+        font_thickness = 1
+        box_thickness = 1
+        padding = 3
+
         frame_detections = []
         if boxes is not None and len(boxes) > 0:
             for box in boxes:
@@ -169,11 +283,16 @@ class YoloDetector(Node):
                 if confidence < class_threshold:
                     continue
 
+                # 단안 거리 계산
+                bbox = [float(x1), float(y1), float(x2), float(y2)]
+                dist_m = self.estimate_distance(class_id, bbox)
+
                 frame_detections.append({
                     'class_id': class_id,
                     'class_name': class_name,
                     'confidence': confidence,
-                    'bbox': [float(x1), float(y1), float(x2), float(y2)],
+                    'bbox': bbox,
+                    'distance_m': dist_m,
                 })
 
         stable_detections = self._update_temporal_tracks(frame_detections)
@@ -183,6 +302,7 @@ class YoloDetector(Node):
             confidence = item['confidence']
             class_id = item['class_id']
             class_name = item['class_name']
+            dist_m = item.get('distance_m', self.estimate_distance(class_id, [x1, y1, x2, y2]))
             cx = (x1 + x2) / 2.0
             cy = (y1 + y2) / 2.0
             w = x2 - x1
@@ -198,15 +318,19 @@ class YoloDetector(Node):
             hypothesis = ObjectHypothesisWithPose()
             hypothesis.hypothesis.class_id = str(class_id)
             hypothesis.hypothesis.score = confidence
+            hypothesis.pose.pose.position.x = float(cx)
+            hypothesis.pose.pose.position.y = float(cy)
+            hypothesis.pose.pose.position.z = float(dist_m)
             detection.results.append(hypothesis)
 
             detection_array_msg.detections.append(detection)
 
-            # JSON 결과 추가
+            # JSON 결과 추가 (distance_m 포함)
             json_detections.append({
                 'class_id': class_id,
                 'class_name': class_name,
                 'confidence': round(confidence, 3),
+                'distance_m': round(float(dist_m), 2),
                 'bbox': {
                     'x1': round(float(x1), 1),
                     'y1': round(float(y1), 1),
@@ -219,7 +343,7 @@ class YoloDetector(Node):
                 }
             })
 
-            # ── 시각화: 바운딩 박스 + 라벨 그리기 ──
+            # ── 시각화: 바운딩 박스 + 라벨 + 거리 그리기 ──
             color = self._get_color(class_id)
             cv2.rectangle(
                 annotated_image,
@@ -229,7 +353,8 @@ class YoloDetector(Node):
             )
 
             display_name = display_class_names.get(class_name, class_name)
-            label = f'{display_name} {confidence:.2f}'
+
+            label = f'{class_name} {confidence:.2f} | {dist_m:.2f}m'
             label_size, baseline = cv2.getTextSize(
                 label,
                 cv2.FONT_HERSHEY_SIMPLEX,
@@ -347,7 +472,7 @@ class YoloDetector(Node):
         return intersection / union if union > 0.0 else 0.0
 
     def _update_temporal_tracks(self, detections):
-        """연속 프레임 확인으로 순간 오검출과 짧은 검출 누락을 완화한다."""
+        """연속 프레임 확인으로 순간 오검출과 짧은 검출 누락을 완화하고 거리를 스무딩한다."""
         unmatched_tracks = set(range(len(self.temporal_tracks)))
 
         for detection in detections:
@@ -371,7 +496,13 @@ class YoloDetector(Node):
                 continue
 
             track = self.temporal_tracks[best_index]
+            # 거리 스무딩 (EMA)
+            prev_dist = track.get('distance_m', detection['distance_m'])
+            alpha = self.distance_smoothing_alpha
+            smoothed_dist = alpha * detection['distance_m'] + (1.0 - alpha) * prev_dist
+
             track.update(detection)
+            track['distance_m'] = smoothed_dist
             track['hits'] += 1
             track['missed'] = 0
             unmatched_tracks.remove(best_index)

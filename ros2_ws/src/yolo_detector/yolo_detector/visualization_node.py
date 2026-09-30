@@ -105,7 +105,10 @@ class VisualizationNode(Node):
 
             if num > 0:
                 detections = data.get('detections', [])
-                objects = [f"{d['class_name']}({d['confidence']})" for d in detections]
+                objects = []
+                for d in detections:
+                    dist_str = f", {d['distance_m']}m" if 'distance_m' in d else ""
+                    objects.append(f"{d['class_name']}({d['confidence']}{dist_str})")
                 self.get_logger().info(
                     f'🎯 검출 {num}개 ({inference_ms}ms): {", ".join(objects)}'
                 )
