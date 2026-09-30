@@ -142,6 +142,17 @@ class YoloDetector(Node):
 
         # 3) 시각화를 위한 이미지 복사
         annotated_image = cv_image.copy()
+        image_height, image_width = annotated_image.shape[:2]
+
+        display_class_names = {
+            'four_wheeler': '4wheel',
+            'two_wheeler': '2wheel',
+            'person': 'person',
+        }
+        font_scale = 0.4
+        font_thickness = 1
+        box_thickness = 1
+        padding = 3
 
         frame_detections = []
         if boxes is not None and len(boxes) > 0:
@@ -214,25 +225,58 @@ class YoloDetector(Node):
                 annotated_image,
                 (int(x1), int(y1)),
                 (int(x2), int(y2)),
-                color, 2
+                color, box_thickness
             )
 
-            label = f'{class_name} {confidence:.2f}'
-            label_size, _ = cv2.getTextSize(
-                label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+            display_name = display_class_names.get(class_name, class_name)
+            label = f'{display_name} {confidence:.2f}'
+            label_size, baseline = cv2.getTextSize(
+                label,
+                cv2.FONT_HERSHEY_SIMPLEX,
+                font_scale,
+                font_thickness
             )
+
+            label_width = label_size[0] + (padding * 2)
+            label_height = label_size[1] + baseline + (padding * 2)
+            label_left = max(
+                0,
+                min(int(x1), image_width - label_width)
+            )
+            label_right = min(
+                image_width - 1,
+                label_left + label_width
+            )
+            box_top = max(0, min(int(y1), image_height - 1))
+
+            if box_top - label_height >= 0:
+                label_bottom = box_top
+                label_top = label_bottom - label_height
+            else:
+                label_top = box_top
+                label_bottom = min(
+                    image_height - 1,
+                    label_top + label_height
+                )
+
             cv2.rectangle(
                 annotated_image,
-                (int(x1), int(y1) - label_size[1] - 10),
-                (int(x1) + label_size[0], int(y1)),
+                (label_left, label_top),
+                (label_right, label_bottom),
                 color, -1
             )
             cv2.putText(
                 annotated_image,
                 label,
-                (int(x1), int(y1) - 5),
+                (
+                    label_left + padding,
+                    label_top + padding + label_size[1]
+                ),
                 cv2.FONT_HERSHEY_SIMPLEX,
-                0.6, (255, 255, 255), 2
+                font_scale,
+                (255, 255, 255),
+                font_thickness,
+                cv2.LINE_AA
             )
 
         # ── FPS 정보 표시 ──
