@@ -22,6 +22,12 @@ class VisualizationNode(Node):
 
         self.bridge = CvBridge()
 
+        self.lane_data=None
+
+        # OpenCV 창 크기 설정
+        cv2.namedWindow('YOLO Detection Result',cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('YOLO Detection Result',960,540)
+
         # ── 구독자: 검출 결과 이미지 ──
         self.image_sub = self.create_subscription(
             Image,
@@ -70,6 +76,10 @@ class VisualizationNode(Node):
                 )
         except Exception as e:
             self.get_logger().error(f'❌ JSON 파싱 오류: {e}')
+
+    def lane_callback(self, msg):
+        if msg.data[0] > 0.5:
+        self.lane_data=msg.data
 
     def destroy_node(self):
         cv2.destroyAllWindows()
