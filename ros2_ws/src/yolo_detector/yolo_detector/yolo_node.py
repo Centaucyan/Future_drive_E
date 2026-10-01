@@ -342,7 +342,7 @@ class YoloDetector(Node):
             )
 
             display_name = display_class_names.get(class_name, class_name)
-            label = f'{display_name} {confidence:.2f}'
+            label = f'{display_name} {confidence:.2f} | {dist_m:.1f}m'
             label_size, baseline = cv2.getTextSize(
                 label,
                 cv2.FONT_HERSHEY_SIMPLEX,
