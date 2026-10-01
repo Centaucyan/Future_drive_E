@@ -59,3 +59,9 @@ ros2 topic echo /yolo/detections
 -토픽 발행 빈도 확인
 ros2 topic hz /camera/image_raw
 ros2 topic hz /yolo/detections
+
+# 야붐 실행 + yaml
+
+## 야붐 + 라이다 + 단안 거리 추정
+ros2 run yolo_detector lidar_yahboom --ros-args --params-file \
+ src/yolo_detector/config/yaboom_camera_info.yaml
