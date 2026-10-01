@@ -34,7 +34,7 @@ class VisualizationNode(Node):
             Image,
             '/yolo/result_image',
             self.image_callback,
-            10
+            1
         )
 
         # ── 구독자: JSON 검출 결과 ──
@@ -42,7 +42,7 @@ class VisualizationNode(Node):
             String,
             '/yolo/detections_json',
             self.json_callback,
-            10
+            1
         )
 
         # ── 구독자: 차선 검출 결과 ──
@@ -50,7 +50,7 @@ class VisualizationNode(Node):
             Float32MultiArray,
             '/lane/result',
             self.lane_callback,
-            10
+            1
         )
 
         self.get_logger().info('🖥️  VisualizationNode 시작 - 결과 시각화 중...')
