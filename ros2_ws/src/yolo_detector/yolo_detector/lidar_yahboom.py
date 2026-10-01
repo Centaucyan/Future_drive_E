@@ -1,4 +1,7 @@
 #!/usr/bin/env python3
+from networkx.generators import spectral_graph_forge
+from matplotlib import backend_managers
+from aiohttp import client_exceptions
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image,CompressedImage,LaserScan
@@ -14,7 +17,7 @@ class YoloDetector(Node):
         super().__init__('yolo_detector')
 
         self.declare_parameter('video_source','0')
-        self.declare_parameter('model_name','models/futuredrive_yolo26n_aug_v1_best.pt')
+        self.declare_parameter('model_name','models/futuredrive_yolo26n_hardneg_v2_best.pt')
         self.declare_parameter('confidence_threshold',0.5)
         self.declare_parameter('device','cpu')
         self.declare_parameter('input_topic','/image_raw/compressed')
@@ -74,6 +77,8 @@ class YoloDetector(Node):
 
         self.bridge=CvBridge()
         self.latest_scan=None
+        self.previous_distances={}
+        self.previous_time=time.time()
 
         self.scan_sub=self.create_subscription(LaserScan,'/scan',self.scan_callback,10)
         self.subscription=self.create_subscription(CompressedImage,input_topic,self.image_callback,10)
@@ -81,12 +86,13 @@ class YoloDetector(Node):
         self.detection_pub=self.create_publisher(Detection2DArray,'/yolo/detections',10)
         self.json_pub=self.create_publisher(String,'/yolo/detections_json',10)
         self.result_image_pub=self.create_publisher(Image,'/yolo/result_image',10)
+        self.collision_warning_pub=self.create_publisher(String,'/collision_warning',10)
 
         self.inference_count=0
         self.total_inference_time=0.0
 
         self.get_logger().info(f'📥 구독 토픽: {input_topic}')
-        self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image')
+        self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image, /collision_warning')
         self.get_logger().info('🚀 YoloDetector 노드 시작!')
 
     def scan_callback(self,msg):
@@ -164,6 +170,8 @@ class YoloDetector(Node):
         annotated_image=cv_image.copy()
 
         if boxes is not None and len(boxes)>0:
+            collision_candidates = []
+                            
             for box in boxes:
                 x1,y1,x2,y2=box.xyxy[0].cpu().numpy()
                 cx=(x1+x2)/2.0
@@ -181,6 +189,53 @@ class YoloDetector(Node):
                     [float(x1),float(y1),float(x2),float(y2)]
                 )
 
+                # 충돌 판단용 거리
+                warning_distance = distance if distance is not None else monocular_distance
+                image_center = cv_image.shape[1] / 2.0
+
+                # 화면 중앙 ± 20% 정도를 전방 영역으로 설정
+                front_width = cv_image.shape[1] * 0.20
+                is_front = abs(cx - image_center) <= front_width
+                collision_distance_threshold = 1.0
+                danger = (
+                    is_front
+                    and warning_distance is not None
+                    and warning_distance < collision_distance_threshold
+                )
+                
+                # 상대속도 계산
+                current_time = time.time()
+
+                track_key = f"{class_id}_{int(cx / 50)}"
+
+                relative_speed = 0.0
+
+                if (warning_distance is not None
+                    and track_key in self.previous_distances):
+                    previous_distance, previous_time = self.previous_distances[track_key]
+
+                    dt = current_time - previous_time
+
+                    if dt > 0.001:
+                        relative_speed = (  
+                            warning_distance - previous_distance
+                        ) / dt
+
+                if warning_distance is not None:
+                    self.previous_distances[track_key] = (
+                        warning_distance,
+                        current_time
+                    )
+
+                # 위험 객체만 후보에 저장
+                if danger:
+                    collision_candidates.append({
+                        'distance': warning_distance,
+                        'relative_speed': relative_speed,
+                        'object_class': class_name
+                    })
+
+                # Detection 처리                
                 detection=Detection2D()
                 detection.bbox.center.position.x=float(cx)
                 detection.bbox.center.position.y=float(cy)
@@ -241,6 +296,36 @@ class YoloDetector(Node):
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,(255,255,255),2
                 )
+
+            if collision_candidates:
+                most_dangerous = min(
+                    collision_candidates,
+                    key=lambda x: x['distance']
+                )
+                warning_msg = String()
+                warning_msg.data = json.dumps({
+                    'danger': True,
+                    'distance': round(
+                        float(most_dangerous['distance']), 2
+                    ),
+                    'relative_speed': round(
+                        float(most_dangerous['relative_speed']), 2
+                    ),
+                    'object_class': most_dangerous['object_class']
+                }, ensure_ascii=False)
+
+                self.collision_warning_pub.publish(warning_msg)
+
+            else:
+                warning_msg = String()
+                warning_msg.data = json.dumps({
+                    'danger': False,
+                    'distance': -1.0,
+                    'relative_speed': 0.0,
+                    'object_class': ''
+                }, ensure_ascii=False)
+
+                self.collision_warning_pub.publish(warning_msg)
 
         fps=1.0/inference_time if inference_time>0 else 0
         fps_text=f'FPS: {fps:.1f} | Objects: {len(json_detections)}'
