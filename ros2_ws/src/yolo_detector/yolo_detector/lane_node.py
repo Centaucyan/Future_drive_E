@@ -3,9 +3,9 @@
 
 import cv2,numpy as np,rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Float32MultiArray
-from cv_bridge import CvBridge
+#from cv_bridge import CvBridge
 
 
 class LaneDetectionNode(Node):
@@ -13,7 +13,7 @@ class LaneDetectionNode(Node):
         super().__init__('lane_detection_node')
 
         # ROS2 Topic
-        self.declare_parameter('image_topic','/camera/image_raw')
+        self.declare_parameter('image_topic','/image_raw/compressed')
         self.declare_parameter('result_topic','/lane/result')
         self.image_topic=self.get_parameter('image_topic').value
         self.result_topic=self.get_parameter('result_topic').value
@@ -54,35 +54,39 @@ class LaneDetectionNode(Node):
 
         # Perspective Transform 행렬
         self.M=None; self.Minv=None; self.transform_size=None
-        self.bridge=CvBridge()
+        #self.bridge=CvBridge()
 
         # Debug Viewer
         cv2.namedWindow('Bird Eye View',cv2.WINDOW_NORMAL)
         cv2.resizeWindow('Bird Eye View',640,480)
 
         # ROS2 Sub/Pub
-        self.image_sub=self.create_subscription(Image,self.image_topic,self.image_callback,10)
+        self.image_sub=self.create_subscription(CompressedImage,self.image_topic,self.image_callback,10)
         self.result_pub=self.create_publisher(Float32MultiArray,self.result_topic,10)
         self.get_logger().info('Lane detection started')
 
     def image_callback(self,msg):
         try:
-            image=self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+            np_arr=np.frombuffer(msg.data,np.uint8)
+            image=cv2.imdecode(np_arr,cv2.IMREAD_COLOR)
+            if image is None:
+                self.get_logger().error('CompressedImage decoding failed')
+                return
         except Exception as e:
             self.get_logger().error(f'Image conversion failed: {e}')
             return
 
         result=self.detect(image)
         data=[float(result['valid']),result['lane_center_x'],result['lateral_offset'],
-              result['left_bottom_x'],result['right_bottom_x']]
+            result['left_bottom_x'],result['right_bottom_x']]
 
-        # 검출 성공 시 원본 영상 좌표의 좌/우 차선 점 추가
         if result['valid']:
             for lx,ly,rx,ry in zip(result['left_points_x'],result['left_points_y'],
-                                   result['right_points_x'],result['right_points_y']):
+                                result['right_points_x'],result['right_points_y']):
                 data.extend([lx,ly,rx,ry])
 
-        out=Float32MultiArray(); out.data=[float(x) for x in data]
+        out=Float32MultiArray()
+        out.data=[float(x) for x in data]
         self.result_pub.publish(out)
 
     def create_perspective_transform(self,w,h):
