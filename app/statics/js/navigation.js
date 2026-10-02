@@ -6,10 +6,12 @@ export function initialPoseMessage(pose, nowMs = Date.now()) {
 }
 // ROS 2 rosbridge action protocol. This module never sends a goal on connection.
 export class Navigation {
-  constructor(report, changed) { this.report=report; this.changed=changed; this.socket=null; this.active=null; this.pendingStop=null; this.timers=[]; }
+  constructor(report, changed) { this.report=report; this.changed=changed; this.socket=null; this.url=''; this.active=null; this.pendingStop=null; this.timers=[]; }
   get busy(){return !!(this.active||this.pendingStop);}
   connect(url, config) {
-    this.close(); this.config=config;
+    this.config=config;
+    if(this.url===url&&this.socket&&(this.socket.readyState===WebSocket.CONNECTING||this.socket.readyState===WebSocket.OPEN))return;
+    this.close();this.url=url;
     if(!url)return;
     const socket=this.socket=new WebSocket(url);
     socket.onmessage=event=>{if(socket!==this.socket)return;let m;try{m=JSON.parse(event.data);}catch{return;}
@@ -69,5 +71,5 @@ export class Navigation {
     this.timers.push(setTimeout(()=>{if(this.pendingStop===id){this.pendingStop=null;this.report('정지 응답 시간 초과 · 실제 로봇 상태를 확인하고 다시 정지하세요.');this.changed();}},6000));
     this.report('정지 요청 중 · 주행 취소 및 속도 0 전송');this.changed();
   }
-  close(){for(const t of this.timers)clearTimeout(t);this.timers=[];if(this.socket){this.socket.onclose=null;this.socket.close();}this.socket=null;this.active=null;this.pendingStop=null;}
+  close(){for(const t of this.timers)clearTimeout(t);this.timers=[];if(this.socket){this.socket.onclose=null;this.socket.close();}this.socket=null;this.url='';this.active=null;this.pendingStop=null;}
 }
