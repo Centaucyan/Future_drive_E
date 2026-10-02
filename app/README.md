@@ -1,6 +1,6 @@
 # 야붐카 ROS 웹 뷰어
 
-ROS 2 Humble 기반 야붐카의 지도, 위치, 경로, 라이다, TF, 카메라와 상태 정보를 표시하는 FastAPI 웹 애플리케이션입니다. 웹에서 ROS Domain ID를 입력하면 FastAPI가 로봇별 rosbridge를 자동으로 실행합니다.
+ROS 2 Humble 기반 야붐카의 지도, 위치, 경로, 라이다, TF, 카메라와 상태 정보를 표시하는 FastAPI 웹 애플리케이션입니다. 웹에서 로봇별 rosbridge WebSocket 주소를 설정해 연결합니다.
 
 ## 주요 기능
 
@@ -11,7 +11,9 @@ ROS 2 Humble 기반 야붐카의 지도, 위치, 경로, 라이다, TF, 카메�
 - 배터리 전압 기반 추정 잔량
 - 지도에서 초기 위치와 목적지 선택
 - Nav2 자율주행 요청과 정지
-- 로봇 3대의 개별 Domain 설정
+- 로봇 3대의 개별 rosbridge 연결 설정
+- Robot 1·2 동시 연결과 별도 URDF/TF 표시를 제공하는 ALL 보기
+- ALL 보기의 이중 카메라와 두 로봇 동시 정지
 
 ## 요구 환경과 설치
 
@@ -38,20 +40,16 @@ bash app/management/start-web.sh
 - 같은 Tailnet의 팀원: `http://<서버 PC Tailscale IP>:8081/`
 - 오프라인 데모: `http://<서버 PC IP>:8081/?demo=1`
 
-일반적인 사용에서는 `start-bridge.sh`를 별도로 실행하지 않습니다. FastAPI가 연결 요청을 받으면 rosbridge를 자동으로 준비합니다.
+각 로봇 PC에서 rosbridge가 실행 중이어야 하며 웹 서버 PC와 브라우저에서 해당 WebSocket 주소에 접근할 수 있어야 합니다.
 
 ## 웹에서 로봇 연결
 
 1. Autonomy Studio 등에서 로봇의 Map, Localization, Planning, Vehicle 모듈을 실행합니다.
 2. 웹 상단에서 로봇을 선택합니다.
-3. **연결 설정**에서 로봇의 ROS Domain ID를 입력합니다.
+3. **연결 설정**에서 해당 로봇의 rosbridge 주소(`ws://<로봇 IP>:9090`)를 입력합니다.
 4. **저장 및 연결**을 누릅니다.
 
-서버는 로봇 설정별로 9100번부터 WebSocket 포트를 할당합니다. 브라우저는 웹 서버 주소와 할당된 포트를 조합해 자동 접속하므로 팀원이 rosbridge 주소를 직접 입력할 필요가 없습니다.
-
-로봇 IP와 SSH 정보는 입력하지 않습니다. 같은 LAN의 ROS 2 DDS 멀티캐스트에서 Domain ID가 일치하는 로봇을 찾습니다.
-
-이 방식은 웹 서버 PC와 로봇이 같은 LAN에서 DDS 멀티캐스트를 사용할 수 있어야 합니다. Tailscale처럼 멀티캐스트가 전달되지 않는 환경에는 별도의 DDS Discovery Server 또는 피어 설정이 필요합니다.
+각 로봇의 rosbridge 주소는 브라우저 로컬 저장소에 개별 저장됩니다. HTTPS로 웹을 제공하는 경우에는 브라우저 보안 정책에 맞춰 `wss://` 주소가 필요합니다.
 
 ## 주요 파일과 실행 로그
 
@@ -83,6 +81,8 @@ bash app/management/start-web.sh
 | 배터리 | `/battery` |
 
 초기 위치는 선택한 rosbridge를 통해 `/initialpose`로 전송합니다. 목적지는 `/navigate_to_pose`, 정지는 Nav2 목표 취소와 `/cmd_vel` 속도 0으로 전송합니다.
+
+ALL 보기는 Robot 1과 Robot 2의 기존 연결 상태를 재사용합니다. 단독 보기에서 주행 중인 로봇을 ALL로 전환해도 해당 WebSocket과 Navigation 객체를 닫지 않으며, 다른 로봇 연결만 추가합니다. ALL에서는 새로운 초기 위치·목적지·주행 명령을 비활성화하고 정지 버튼만 두 로봇에 전달합니다. 두 `/map` 메시지의 frame ID, 해상도, 크기, 원점을 비교해 공통 좌표계 여부도 화면에 표시합니다.
 
 ## 배터리 추정 잔량
 

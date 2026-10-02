@@ -6,3 +6,4 @@
 
 .lidar-red{background:#ff3535}
 .battery-card{margin-top:12px;padding:12px;border:1px solid #243048;border-radius:12px;background:#050a17}.battery-card strong{display:block;font-size:16px;color:#37d8b0}.battery-card small{display:block;margin-top:4px}.battery-card strong.low{color:#ff6262}
+.camera-stack{display:grid;gap:9px}.camera-panel>b{display:block;margin:0 0 5px;color:#9fb3d1;font-size:11px}.camera-stack:has(.camera-panel:nth-child(2):not([hidden])) .camera{height:82px}.all-button{border-color:#2ccba8;color:#61e6c5}.frame-warning{color:#ffb347!important}@media(max-width:850px){.camera-stack:has(.camera-panel:nth-child(2):not([hidden])) .camera{height:150px}}
