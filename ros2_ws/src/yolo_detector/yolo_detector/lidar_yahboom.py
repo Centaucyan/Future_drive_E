@@ -216,7 +216,7 @@ class YoloDetector(Node):
                 # 화면 중앙 ± 20% 정도를 전방 영역으로 설정
                 front_width = cv_image.shape[1] * 0.20
                 is_front = abs(cx - image_center) <= front_width
-                collision_distance_threshold = 1.0
+                collision_distance_threshold = 0.5
                 danger = (
                     is_front
                     and warning_distance is not None
