@@ -3,9 +3,9 @@
 
 import cv2,numpy as np,rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import CompressedImage
 from std_msgs.msg import Float32MultiArray
-from cv_bridge import CvBridge
+#from cv_bridge import CvBridge
 
 
 class LaneDetectionNode(Node):
@@ -13,79 +13,76 @@ class LaneDetectionNode(Node):
         super().__init__('lane_detection_node')
 
         # ROS2 Topic
-        self.declare_parameter('image_topic','/camera/image_raw')
+        self.declare_parameter('image_topic','/image_raw/compressed')
         self.declare_parameter('result_topic','/lane/result')
         self.image_topic=self.get_parameter('image_topic').value
         self.result_topic=self.get_parameter('result_topic').value
 
         # Threshold: HLS/LAB 색상 + Sobel X
-        self.yellow_h_min=15
-        self.yellow_h_max=35
-        self.yellow_s_min=70
-        self.yellow_l_min=70
-        self.sobel_low=50
-        self.sobel_high=255
+        self.yellow_h_min=15; self.yellow_h_max=35
+        self.yellow_s_min=70; self.yellow_l_min=70
+        self.sobel_low=50; self.sobel_high=255
 
         # Sliding Window
-        self.nwindows=9
-        self.window_margin=80
-        self.minpix=50
+        self.nwindows=9; self.window_margin=80; self.minpix=50
+
+        # 흰색 물체 제거용
+        # 한 window 안에서 이보다 넓게 퍼진 픽셀은 차선 후보로 사용하지 않음
+        self.max_lane_pixel_width=120
+
+        # 최소 몇 개의 window에서 차선 픽셀이 나와야 하는가
+        self.min_valid_windows=5
 
         # Polynomial fitting
-        self.min_fit_points=50
-        self.max_fit_rmse=70.0
+        self.min_fit_points=50; self.max_fit_rmse=70.0
+
+        # fitting 대상이 영상의 y 방향으로 충분히 길어야 함
+        # h * min_fit_y_span_ratio
+        self.min_fit_y_span_ratio=0.20
 
         # 차선 폭/위치 검증 및 프레임 간 변화 제한
         self.min_lane_width_ratio=0.15
         self.max_lane_width_ratio=0.85
         self.max_width_change_ratio=0.50
-        self.max_offset_jump_ratio=0.20
-        self.smooth_factor=0.7
-        self.num_lane_points=20
+
+        self.smooth_factor=0.7; self.num_lane_points=20
 
         # 이전 프레임의 차선 정보
-        self.prev_left_fit=None
-        self.prev_right_fit=None
-        self.prev_lane_width=None
-        self.prev_offset=None
+        self.prev_left_fit=None; self.prev_right_fit=None
+        self.prev_lane_width=None; self.prev_offset=None
         self.failed_count=0
 
         # Perspective Transform 행렬
-        self.M=None
-        self.Minv=None
-        self.transform_size=None
-        self.bridge=CvBridge()
+        self.M=None; self.Minv=None; self.transform_size=None
+        #self.bridge=CvBridge()
+
+        # Debug Viewer
+        cv2.namedWindow('Bird Eye View',cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('Bird Eye View',640,480)
 
         # ROS2 Sub/Pub
-        self.image_sub=self.create_subscription(Image,self.image_topic,self.image_callback,10)
+        self.image_sub=self.create_subscription(CompressedImage,self.image_topic,self.image_callback,10)
         self.result_pub=self.create_publisher(Float32MultiArray,self.result_topic,10)
-
         self.get_logger().info('Lane detection started')
 
     def image_callback(self,msg):
         try:
-            image=self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
+            np_arr=np.frombuffer(msg.data,np.uint8)
+            image=cv2.imdecode(np_arr,cv2.IMREAD_COLOR)
+            if image is None:
+                self.get_logger().error('CompressedImage decoding failed')
+                return
         except Exception as e:
             self.get_logger().error(f'Image conversion failed: {e}')
             return
 
         result=self.detect(image)
+        data=[float(result['valid']),result['lane_center_x'],result['lateral_offset'],
+            result['left_bottom_x'],result['right_bottom_x']]
 
-        # /lane/result 기본 구성
-        data=[
-            float(result['valid']),
-            result['lane_center_x'],
-            result['lateral_offset'],
-            result['left_bottom_x'],
-            result['right_bottom_x']
-        ]
-
-        # 검출 성공 시 원본 영상 좌표의 좌/우 차선 점 추가
         if result['valid']:
-            for lx,ly,rx,ry in zip(
-                result['left_points_x'],result['left_points_y'],
-                result['right_points_x'],result['right_points_y']
-            ):
+            for lx,ly,rx,ry in zip(result['left_points_x'],result['left_points_y'],
+                                result['right_points_x'],result['right_points_y']):
                 data.extend([lx,ly,rx,ry])
 
         out=Float32MultiArray()
@@ -93,27 +90,19 @@ class LaneDetectionNode(Node):
         self.result_pub.publish(out)
 
     def create_perspective_transform(self,w,h):
-        """ 원본 영상의 사다리꼴 영역 -> 직사각형(Bird's-Eye View) """
+        """원본 영상의 사다리꼴 영역 -> 직사각형(Bird's-Eye View)"""
         if self.transform_size==(w,h) and self.M is not None:return
 
         # 카메라 기준으로 캘리브레이션 필요
-        src=np.float32([
-            [w*.28,h*.95],[w*.45,h*.75],
-            [w*.55,h*.75],[w*.75,h*.95]
-        ])
-        dst=np.float32([
-            [w*.25,h],[w*.25,0],
-            [w*.75,0],[w*.75,h]
-        ])
+        src=np.float32([[w*.20,h*.95],[w*.40,h*.70],[w*.60,h*.70],[w*.80,h*.95]])
+        dst=np.float32([[w*.25,h],[w*.25,0],[w*.75,0],[w*.75,h]])
         self.M=cv2.getPerspectiveTransform(src,dst)
         self.Minv=cv2.getPerspectiveTransform(dst,src)
         self.transform_size=(w,h)
 
     def threshold_lane(self,image):
-        """ 차선 후보를 Binary 영상으로 생성 """
+        """차선 후보를 Binary 영상으로 생성"""
         h,w=image.shape[:2]
-
-        # Gaussian Blur: 영상 노이즈 제거
         blurred=cv2.GaussianBlur(image,(5,5),0)
 
         # HLS 색상 정보
@@ -135,25 +124,19 @@ class LaneDetectionNode(Node):
 
         # White / Yellow 차선 검출
         white_mask=(l_chan>=adaptive_white_min)|((l_clahe>=185)&(s_chan<=110))
-        yellow_mask=(b_lab>=150)|((h_chan>=self.yellow_h_min)&(h_chan<=self.yellow_h_max)&(s_chan>=self.yellow_s_min)&(l_chan>=self.yellow_l_min))
+        yellow_mask=(b_lab>=150)|((h_chan>=self.yellow_h_min)&(h_chan<=self.yellow_h_max)&
+                                   (s_chan>=self.yellow_s_min)&(l_chan>=self.yellow_l_min))
         color_mask=white_mask|yellow_mask
 
         # Sobel X: 차선과 도로 사이의 밝기 변화 검출
         sobelx=cv2.Sobel(l_clahe,cv2.CV_64F,1,0,ksize=3)
-        abs_sobel=np.absolute(sobelx)
-        max_value=abs_sobel.max()
-
-        if max_value>1e-6:
-            scaled_sobel=np.uint8(255*abs_sobel/max_value)
-        else:
-            scaled_sobel=np.zeros_like(l_chan)
-
+        abs_sobel=np.absolute(sobelx); max_value=abs_sobel.max()
+        scaled_sobel=np.uint8(255*abs_sobel/max_value) if max_value>1e-6 else np.zeros_like(l_chan)
         gradient_mask=(scaled_sobel>=self.sobel_low)&(scaled_sobel<=self.sobel_high)&(l_clahe>=140)
 
         # 색상 검출 + 경계 검출
         combined=color_mask|gradient_mask
-        binary=np.zeros_like(l_chan,dtype=np.uint8)
-        binary[combined]=255
+        binary=np.zeros_like(l_chan,dtype=np.uint8); binary[combined]=255
 
         # 작은 점 형태의 노이즈 제거
         kernel=cv2.getStructuringElement(cv2.MORPH_RECT,(3,3))
@@ -168,27 +151,55 @@ class LaneDetectionNode(Node):
         return cv2.warpPerspective(binary,self.M,(w,h),flags=cv2.INTER_LINEAR)
 
     def histogram(self,binary_warped):
-        """ 하단 영역의 차선 픽셀 분포로 좌/우 차선 시작점 탐색 """
+        """하단 영역의 여러 차선 후보 중 중심에 가장 가까운 좌/우 차선 선택"""
         h,w=binary_warped.shape[:2]
         hist=np.sum(binary_warped[int(h*.50):,:]>0,axis=0)
 
         left_min_x,left_max_x=int(w*.08),int(w*.45)
         right_min_x,right_max_x=int(w*.55),int(w*.92)
-        left_sub,right_sub=hist[left_min_x:left_max_x],hist[right_min_x:right_max_x]
 
-        left_base=int(np.argmax(left_sub)+left_min_x) if len(left_sub)>0 and np.max(left_sub)>0 else int(w*.25)
-        right_base=int(np.argmax(right_sub)+right_min_x) if len(right_sub)>0 and np.max(right_sub)>0 else int(w*.75)
+        def find_peaks(sub_hist,min_distance=80,min_height=30):
+            peaks=[]
+            for i in range(1,len(sub_hist)-1):
+                if sub_hist[i]>=sub_hist[i-1] and sub_hist[i]>=sub_hist[i+1] and sub_hist[i]>=min_height:
+                    x=i
+                    if not peaks or x-peaks[-1]>=min_distance: peaks.append(x)
+                    elif sub_hist[x]>sub_hist[peaks[-1]]: peaks[-1]=x
+            return peaks
 
-        return hist,left_base,right_base
+        left_candidates=[x+left_min_x for x in find_peaks(hist[left_min_x:left_max_x])]
+        right_candidates=[x+right_min_x for x in find_peaks(hist[right_min_x:right_max_x])]
+
+        # 후보가 없으면 기존 기본값 사용
+        if not left_candidates:left_candidates=[int(w*.25)]
+        if not right_candidates:right_candidates=[int(w*.75)]
+
+        # 좌우 후보쌍 중 차선 중심이 영상 중심에 가장 가까운 쌍 선택
+        image_center=w/2.0; best_pair=None; best_score=float('inf')
+
+        for left in left_candidates:
+            for right in right_candidates:
+                if left>=right:continue
+                score=abs((left+right)/2.0-image_center)
+                if score<best_score:
+                    best_score=score; best_pair=(left,right)
+
+        if best_pair is None:
+            left_base,right_base=int(w*.25),int(w*.75)
+        else:
+            left_base,right_base=best_pair
+
+        return hist,int(left_base),int(right_base)
 
     def find_lane_pixels(self,binary_warped):
-        """ 최초 검출 또는 이전 차선 정보가 없을 때 사용 """
+        """최초 검출 또는 이전 차선 정보가 없을 때 사용"""
         h,w=binary_warped.shape[:2]
         hist,left_base,right_base=self.histogram(binary_warped)
         nonzeroy,nonzerox=binary_warped.nonzero()
         window_height=max(1,h//self.nwindows)
         left_current,right_current=left_base,right_base
         left_lane_inds,right_lane_inds=[],[]
+        left_window_counts,right_window_counts=[],[]
 
         for window in range(self.nwindows):
             win_y_low=h-(window+1)*window_height
@@ -196,46 +207,60 @@ class LaneDetectionNode(Node):
             lx1,lx2=left_current-self.window_margin,left_current+self.window_margin
             rx1,rx2=right_current-self.window_margin,right_current+self.window_margin
 
-            good_left=((nonzeroy>=win_y_low)&(nonzeroy<win_y_high)&(nonzerox>=lx1)&(nonzerox<lx2)).nonzero()[0]
-            good_right=((nonzeroy>=win_y_low)&(nonzeroy<win_y_high)&(nonzerox>=rx1)&(nonzerox<rx2)).nonzero()[0]
-            left_lane_inds.append(good_left)
-            right_lane_inds.append(good_right)
+            good_left=((nonzeroy>=win_y_low)&(nonzeroy<win_y_high)&
+                       (nonzerox>=lx1)&(nonzerox<lx2)).nonzero()[0]
+            good_right=((nonzeroy>=win_y_low)&(nonzeroy<win_y_high)&
+                        (nonzerox>=rx1)&(nonzerox<rx2)).nonzero()[0]
 
-            if len(good_left)>self.minpix:left_current=int(np.mean(nonzerox[good_left]))
-            if len(good_right)>self.minpix:right_current=int(np.mean(nonzerox[good_right]))
+            # 흰색 차량/반사광처럼 window 전체에 넓게 퍼진 픽셀은 차선 후보에서 제외
+            if len(good_left)>0:
+                x=nonzerox[good_left]
+                if np.percentile(x,95)-np.percentile(x,5)>self.max_lane_pixel_width:
+                    good_left=np.array([],dtype=np.int32)
+
+            if len(good_right)>0:
+                x=nonzerox[good_right]
+                if np.percentile(x,95)-np.percentile(x,5)>self.max_lane_pixel_width:
+                    good_right=np.array([],dtype=np.int32)
+
+            left_lane_inds.append(good_left); right_lane_inds.append(good_right)
+            left_window_counts.append(len(good_left)); right_window_counts.append(len(good_right))
+
+            # 충분히 좁은 차선 후보일 때만 window 이동
+            if len(good_left)>self.minpix:left_current=int(np.median(nonzerox[good_left]))
+            if len(good_right)>self.minpix:right_current=int(np.median(nonzerox[good_right]))
 
         left_lane_inds=np.concatenate(left_lane_inds) if left_lane_inds else np.array([],dtype=np.int32)
         right_lane_inds=np.concatenate(right_lane_inds) if right_lane_inds else np.array([],dtype=np.int32)
 
-        return (
-            nonzerox[left_lane_inds],nonzeroy[left_lane_inds],
-            nonzerox[right_lane_inds],nonzeroy[right_lane_inds],
-            hist,left_base,right_base
-        )
+        return (nonzerox[left_lane_inds],nonzeroy[left_lane_inds],
+                nonzerox[right_lane_inds],nonzeroy[right_lane_inds],
+                hist,left_base,right_base,left_window_counts,right_window_counts)
 
     def search_around_previous_fit(self,binary_warped):
-        """ 이전 프레임의 Polynomial 주변만 탐색 """
+        """이전 프레임의 Polynomial 주변만 탐색"""
         nonzeroy,nonzerox=binary_warped.nonzero()
         left_fit,right_fit=self.prev_left_fit,self.prev_right_fit
-
         left_center=left_fit[0]*nonzeroy**2+left_fit[1]*nonzeroy+left_fit[2]
         right_center=right_fit[0]*nonzeroy**2+right_fit[1]*nonzeroy+right_fit[2]
-
         left_lane_inds=np.abs(nonzerox-left_center)<=self.window_margin
         right_lane_inds=np.abs(nonzerox-right_center)<=self.window_margin
 
-        return (
-            nonzerox[left_lane_inds],nonzeroy[left_lane_inds],
-            nonzerox[right_lane_inds],nonzeroy[right_lane_inds]
-        )
+        return (nonzerox[left_lane_inds],nonzeroy[left_lane_inds],
+                nonzerox[right_lane_inds],nonzeroy[right_lane_inds])
 
     def fit_lane(self,x,y,side,h):
-        """ x = Ay² + By + C 형태로 fitting """
+        """x = Ay² + By + C 형태로 fitting"""
         if len(x)<self.min_fit_points:
             self.get_logger().debug(f'{side} FIT FAIL | points={len(x)}')
             return None
 
         y_span=float(np.max(y)-np.min(y)) if len(y)>0 else 0
+
+        # 특정 영역에만 몰린 흰색 물체 방지
+        if y_span<h*self.min_fit_y_span_ratio:
+            self.get_logger().debug(f'{side} FIT FAIL | y_span={y_span:.1f}')
+            return None
 
         try:
             if y_span<h*.30:
@@ -265,8 +290,24 @@ class LaneDetectionNode(Node):
     def lane_x(self,fit,y):
         return fit[0]*y*y+fit[1]*y+fit[2]
 
+    def validate_lane_shape(self,left_fit,right_fit,h,w):
+        """
+        여러 y 위치에서 차선 폭과 차선 위치를 검사.
+        차량의 넓은 흰색 영역이 좌/우 차선으로 잡힌 경우를 추가로 제거.
+        """
+        ys=np.linspace(h*.15,h-1,10)
+        left_x=self.lane_x(left_fit,ys)
+        right_x=self.lane_x(right_fit,ys)
+        widths=right_x-left_x
+
+        if np.any(widths<=0):return False
+        if np.any(widths<w*self.min_lane_width_ratio):return False
+        if np.any(widths>w*self.max_lane_width_ratio):return False
+
+        return True
+
     def validate_lane(self,left_fit,right_fit,h,w):
-        """ 좌/우 차선 순서, 차선 폭, 프레임 간 폭 변화 검증 """
+        """좌/우 차선 순서, 차선 폭, 프레임 간 폭 변화 검증"""
         y_bottom=h-1
         left_bottom,right_bottom=self.lane_x(left_fit,y_bottom),self.lane_x(right_fit,y_bottom)
         lane_width=right_bottom-left_bottom
@@ -284,16 +325,15 @@ class LaneDetectionNode(Node):
         return True
 
     def transform_point(self,x,y):
-        """ Bird's-Eye View 좌표 → 원본 영상 좌표 """
+        """Bird's-Eye View 좌표 → 원본 영상 좌표"""
         point=np.array([[[float(x),float(y)]]],dtype=np.float32)
         transformed=cv2.perspectiveTransform(point,self.Minv)
         return float(transformed[0,0,0]),float(transformed[0,0,1])
 
     def make_lane_points(self,left_fit,right_fit,h,w):
-        """ Polynomial 차선을 원본 영상 좌표의 점들로 변환 """
+        """Polynomial 차선을 원본 영상 좌표의 점들로 변환"""
         plot_y=np.linspace(0,h-1,self.num_lane_points)
         left_x,right_x=self.lane_x(left_fit,plot_y),self.lane_x(right_fit,plot_y)
-
         left_points=np.stack([left_x,plot_y],axis=1).astype(np.float32).reshape(-1,1,2)
         right_points=np.stack([right_x,plot_y],axis=1).astype(np.float32).reshape(-1,1,2)
 
@@ -305,13 +345,11 @@ class LaneDetectionNode(Node):
         right_original[:,0]=np.clip(right_original[:,0],0,w-1)
         right_original[:,1]=np.clip(right_original[:,1],0,h-1)
 
-        return (
-            left_original[:,0].tolist(),left_original[:,1].tolist(),
-            right_original[:,0].tolist(),right_original[:,1].tolist()
-        )
+        return (left_original[:,0].tolist(),left_original[:,1].tolist(),
+                right_original[:,0].tolist(),right_original[:,1].tolist())
 
     def invalid_result(self):
-        """ 검출 실패가 5회 이상이면 이전 차선 정보 초기화 """
+        """검출 실패가 5회 이상이면 이전 차선 정보 초기화"""
         self.failed_count+=1
 
         if self.failed_count>=5:
@@ -320,16 +358,11 @@ class LaneDetectionNode(Node):
             self.prev_lane_width=None
             self.prev_offset=None
 
-        return {
-            'valid':False,
-            'lane_center_x':0.0,
-            'lateral_offset':0.0,
-            'left_bottom_x':0.0,
-            'right_bottom_x':0.0
-        }
+        return {'valid':False,'lane_center_x':0.0,'lateral_offset':0.0,
+                'left_bottom_x':0.0,'right_bottom_x':0.0}
 
     def detect(self,image):
-        """ 전체 차선 검출 """
+        """전체 차선 검출"""
         h,w=image.shape[:2]
 
         # 1. 차선 후보 생성
@@ -337,6 +370,8 @@ class LaneDetectionNode(Node):
 
         # 2. Bird's-Eye View 변환
         warped=self.perspective_warp(binary)
+        cv2.imshow('Bird Eye View',warped)
+        cv2.waitKey(1)
 
         # 3. 차선 픽셀 탐색
         if self.prev_left_fit is not None and self.prev_right_fit is not None:
@@ -344,9 +379,11 @@ class LaneDetectionNode(Node):
 
             # 이전 위치 주변에서 충분한 픽셀이 없으면 Sliding Window 재탐색
             if len(leftx)<self.min_fit_points or len(rightx)<self.min_fit_points:
-                leftx,lefty,rightx,righty,_,_,_=self.find_lane_pixels(warped)
+                leftx,lefty,rightx,righty,_,_,_,left_window_counts,right_window_counts=self.find_lane_pixels(warped)
+            else:
+                left_window_counts=right_window_counts=None
         else:
-            leftx,lefty,rightx,righty,_,_,_=self.find_lane_pixels(warped)
+            leftx,lefty,rightx,righty,_,_,_,left_window_counts,right_window_counts=self.find_lane_pixels(warped)
 
         # 4. Polynomial fitting
         left_fit=self.fit_lane(leftx,lefty,'LEFT',h)
@@ -355,17 +392,21 @@ class LaneDetectionNode(Node):
         if left_fit is None or right_fit is None:
             return self.invalid_result()
 
-        # 5. 좌/우 차선 검증
+        # 5. 기본 차선 검증
         if not self.validate_lane(left_fit,right_fit,h,w):
             return self.invalid_result()
 
-        # 6. Bird's-Eye View 하단의 차선 위치
+        # 6. 차선 형태 검증
+        if not self.validate_lane_shape(left_fit,right_fit,h,w):
+            return self.invalid_result()
+
+        # 7. Bird's-Eye View 하단 차선 위치
         y_bottom=h-1
         left_bottom_warp=float(self.lane_x(left_fit,y_bottom))
         right_bottom_warp=float(self.lane_x(right_fit,y_bottom))
         center_bottom_warp=(left_bottom_warp+right_bottom_warp)/2.0
 
-        # 7. 원본 영상 좌표로 변환
+        # 8. 원본 영상 좌표로 변환
         left_bottom_x,_=self.transform_point(left_bottom_warp,y_bottom)
         right_bottom_x,_=self.transform_point(right_bottom_warp,y_bottom)
         center_bottom_x,_=self.transform_point(center_bottom_warp,y_bottom)
@@ -375,13 +416,7 @@ class LaneDetectionNode(Node):
         lane_center_x=center_bottom_x
         lateral_offset=lane_center_x-image_center
 
-        # 8. 프레임 간 Offset 급변 방지
-        if self.prev_offset is not None:
-            offset_jump=abs(lateral_offset-self.prev_offset)
-            if offset_jump>w*self.max_offset_jump_ratio:
-                return self.invalid_result()
-
-        # 9. EMA smoothing
+        # 10. EMA smoothing
         if self.prev_left_fit is not None and self.prev_right_fit is not None:
             smooth_left_fit=self.smooth_factor*left_fit+(1.0-self.smooth_factor)*self.prev_left_fit
             smooth_right_fit=self.smooth_factor*right_fit+(1.0-self.smooth_factor)*self.prev_right_fit
@@ -396,7 +431,7 @@ class LaneDetectionNode(Node):
         self.prev_lane_width=lane_width_warp
         self.prev_offset=lateral_offset
 
-        # 10. 원본 영상 좌표의 차선 점 생성
+        # 11. 원본 영상 좌표의 차선 점 생성
         left_points_x,left_points_y,right_points_x,right_points_y=self.make_lane_points(
             smooth_left_fit,smooth_right_fit,h,w
         )
@@ -414,6 +449,7 @@ class LaneDetectionNode(Node):
         }
 
     def destroy_node(self):
+        cv2.destroyAllWindows()
         self.destroy_subscription(self.image_sub)
         self.destroy_publisher(self.result_pub)
         super().destroy_node()

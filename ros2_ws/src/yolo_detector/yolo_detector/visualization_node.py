@@ -25,12 +25,16 @@ class VisualizationNode(Node):
 
         self.lane_data=None
 
+        # OpenCV 창 크기 설정
+        cv2.namedWindow('YOLO Detection Result',cv2.WINDOW_NORMAL)
+        cv2.resizeWindow('YOLO Detection Result',960,540)
+
         # ── 구독자: 검출 결과 이미지 ──
         self.image_sub = self.create_subscription(
             Image,
             '/yolo/result_image',
             self.image_callback,
-            10
+            1
         )
 
         # ── 구독자: JSON 검출 결과 ──
@@ -38,7 +42,7 @@ class VisualizationNode(Node):
             String,
             '/yolo/detections_json',
             self.json_callback,
-            10
+            1
         )
 
         # ── 구독자: 차선 검출 결과 ──
@@ -46,7 +50,7 @@ class VisualizationNode(Node):
             Float32MultiArray,
             '/lane/result',
             self.lane_callback,
-            10
+            1
         )
 
         self.get_logger().info('🖥️  VisualizationNode 시작 - 결과 시각화 중...')
@@ -101,7 +105,10 @@ class VisualizationNode(Node):
 
             if num > 0:
                 detections = data.get('detections', [])
-                objects = [f"{d['class_name']}({d['confidence']})" for d in detections]
+                objects = []
+                for d in detections:
+                    dist_str = f", {d['distance_m']}m" if 'distance_m' in d else ""
+                    objects.append(f"{d['class_name']}({d['confidence']}{dist_str})")
                 self.get_logger().info(
                     f'🎯 검출 {num}개 ({inference_ms}ms): {", ".join(objects)}'
                 )
@@ -109,7 +116,8 @@ class VisualizationNode(Node):
             self.get_logger().error(f'❌ JSON 파싱 오류: {e}')
 
     def lane_callback(self, msg):
-        self.lane_data=msg.data
+        if msg.data[0] > 0.5:
+            self.lane_data=msg.data
 
     def destroy_node(self):
         cv2.destroyAllWindows()

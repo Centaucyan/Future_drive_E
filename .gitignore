@@ -14,3 +14,4 @@ install/
 log/
 *.mp4
 .venv/
+*.webm

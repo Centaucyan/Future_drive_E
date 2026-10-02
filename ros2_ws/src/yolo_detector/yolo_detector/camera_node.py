@@ -5,7 +5,6 @@
 - 발행 토픽: /camera/image_raw (sensor_msgs/Image)
 """
 
-from networkx.generators import spectral_graph_forge
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image

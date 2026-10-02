@@ -1,0 +1,12 @@
+yolo_detector:
+  ros__parameters:
+    image_width: 640
+    image_height: 480
+    fx: 438.783367
+    fy: 437.302876
+    cx: 305.593336
+    cy: 243.738352
+    fov_x: 72.0
+    fov_y: 57.5
+    height_m: 0.085
+    pitch: 0.0
