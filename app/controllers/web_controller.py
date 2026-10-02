@@ -1,58 +1,62 @@
-"""실제 로봇 정지를 확인하지 않는 ROS2 STOP 테스트 API입니다."""
-from fastapi import APIRouter, Depends
+"""화면과 브라우저용 설정 API를 제공하는 Controller."""
+import asyncio
+import json
+from pathlib import Path
+from urllib.error import HTTPError, URLError
+from urllib.request import Request, urlopen
+
+from fastapi import APIRouter, HTTPException
+from fastapi.responses import FileResponse
+from pydantic import BaseModel
+
+from app.models.viewer_model import viewer_settings
 
 
-def create_router(get_ros_model):
-    """서버가 제공하는 모델 조회 함수를 받아 요청마다 모델을 주입합니다."""
+class InitialPosePayload(BaseModel):
+    x: float
+    y: float
+    yaw: float = 0.0
+    frame_id: str = "map"
+
+
+def _post_platform(path: str, payload: dict) -> dict:
+    request = Request(
+        viewer_settings.platform_bridge_url.rstrip("/") + path,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=5) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except HTTPError as error:
+        try:
+            detail = json.loads(error.read().decode("utf-8")).get("detail")
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            detail = None
+        raise HTTPException(error.code, detail or "플랫폼 제어 API가 요청을 거부했습니다.") from error
+    except (URLError, TimeoutError, OSError) as error:
+        raise HTTPException(503, "플랫폼 제어 API에 연결할 수 없습니다.") from error
+
+
+def create_router(view_path: Path) -> APIRouter:
     router = APIRouter()
 
+    @router.get("/", include_in_schema=False)
+    @router.get("/index.html", include_in_schema=False)
+    async def viewer() -> FileResponse:
+        return FileResponse(view_path)
 
-    # 전체 긴급정지 버튼 - ROS2 통신 테스트 모드
-    @router.post("/api/master-emergency-stop")
-    async def emergency_stop(ros_model=Depends(get_ros_model)):
+    @router.get("/api/viewer-config")
+    async def viewer_config() -> dict[str, str]:
+        return viewer_settings.to_dict()
 
-        # 주입받은 모델을 통해 기존 테스트 전용 Topic에 발행합니다.
-        ros_model.publish_stop()
+    @router.get("/api/health")
+    async def health() -> dict[str, str]:
+        return {"status": "ok"}
 
-        print(
-            "[HMI ALL STOP -> ROS2 TEST] STOP published!",
-            flush=True
-        )
-
-        return {
-            "success": True,
-            "command": "STOP",
-            "topic": "/ap_test/control/request",
-            "test_only": True,
-            "executed": False,
-            "message": "ROS2 test message published. Robot stop is not confirmed."
-        }
-
-
-
-    # ============================================================
-    # 8. ROS2 STOP 통신 테스트 API (새로 추가)
-    # ============================================================
-
-    @router.post("/api/test/stop")
-    async def test_stop(ros_model=Depends(get_ros_model)):
-
-        # 메시지 생성과 ROS2 발행은 모델에 위임합니다.
-        ros_model.publish_stop()
-
-        # FastAPI 실행 터미널에 출력
-        print(
-            "[FastAPI -> ROS2] STOP message published!",
-            flush=True
-        )
-
-        # 웹으로 HTTP 응답 반환
-        return {
-            "success": True,
-            "command": "STOP",
-            "topic": "/ap_test/control/request",
-            "test_only": True,
-            "executed": False
-        }
+    @router.post("/api/control/initialpose")
+    async def initial_pose(payload: InitialPosePayload) -> dict:
+        return await asyncio.to_thread(_post_platform, "/initialpose", payload.model_dump())
 
     return router

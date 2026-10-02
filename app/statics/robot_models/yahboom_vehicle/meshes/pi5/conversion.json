@@ -1,0 +1,37 @@
+{
+  "bounds_ros_m": [
+    [
+      -0.16315217316150665,
+      -0.07669481635093689,
+      -9.201839566230774e-05
+    ],
+    [
+      0.12379159778356552,
+      0.07669482380151749,
+      0.13575001060962677
+    ]
+  ],
+  "parts": {
+    "yahboom_body": {
+      "vertices": 151771,
+      "faces": 91337
+    },
+    "yahboom_front_left": {
+      "vertices": 2606,
+      "faces": 2266
+    },
+    "yahboom_front_right": {
+      "vertices": 2607,
+      "faces": 2267
+    },
+    "yahboom_rear_left": {
+      "vertices": 2610,
+      "faces": 2267
+    },
+    "yahboom_rear_right": {
+      "vertices": 2608,
+      "faces": 2266
+    }
+  },
+  "alignment": "STEP Z-up: rotate Z pi, translate X -0.002m; base_footprint Z offset 0.04525m"
+}
