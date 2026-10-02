@@ -6,4 +6,4 @@ PYTHON=python3
 if [[ -x app/.venv/bin/python ]]; then
   PYTHON=app/.venv/bin/python
 fi
-exec "$PYTHON" app/app.py
+exec "$PYTHON" -m app.app

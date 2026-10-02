@@ -1,4 +1,4 @@
-"""실행 진입점: python3 app.py"""
+"""실행 진입점: python3 -m app.app"""
 import os
 
 import uvicorn
