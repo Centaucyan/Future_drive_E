@@ -26,7 +26,7 @@ class YoloDetector(Node):
         super().__init__('yolo_detector')
 
         # ── 파라미터 선언 ──
-        self.declare_parameter('model_name', 'models/futuredrive_yolo26n_hardneg_v2_best.pt')   # YOLO 학습모델 사용시 모델명 변경
+        self.declare_parameter('model_name', 'models/futuredrive_yolo26n_best.pt')   # YOLO 학습모델 사용시 모델명 변경
         self.declare_parameter('confidence_threshold', 0.5)     # 신뢰도 임계값
         self.declare_parameter('four_wheeler_confidence', 0.45)
         self.declare_parameter('two_wheeler_confidence', 0.25)
@@ -34,6 +34,12 @@ class YoloDetector(Node):
         self.declare_parameter('confirmation_frames', 2)
         self.declare_parameter('max_missed_frames', 2)
         self.declare_parameter('temporal_iou_threshold', 0.3)
+        self.declare_parameter('merge_person_two_wheeler', True)
+        self.declare_parameter('merge_max_horizontal_gap_ratio', 0.35)
+        self.declare_parameter('merge_min_vertical_overlap_ratio', 0.20)
+        self.declare_parameter('merge_max_bottom_gap_ratio', 0.35)
+        self.declare_parameter('class_conflict_iou_threshold', 0.55)
+        self.declare_parameter('class_conflict_shape_ratio', 0.65)
         self.declare_parameter('device', 'cpu')                 # 'cpu' 또는 'cuda'
         self.declare_parameter('input_topic', '/camera/image_raw')
         self.declare_parameter('camera_info_topic', '/camera/camera_info')
@@ -70,6 +76,22 @@ class YoloDetector(Node):
         self.confirmation_frames = self.get_parameter('confirmation_frames').value
         self.max_missed_frames = self.get_parameter('max_missed_frames').value
         self.temporal_iou_threshold = self.get_parameter('temporal_iou_threshold').value
+        self.merge_person_two_wheeler = self.get_parameter('merge_person_two_wheeler').value
+        self.merge_max_horizontal_gap_ratio = self.get_parameter(
+            'merge_max_horizontal_gap_ratio'
+        ).value
+        self.merge_min_vertical_overlap_ratio = self.get_parameter(
+            'merge_min_vertical_overlap_ratio'
+        ).value
+        self.merge_max_bottom_gap_ratio = self.get_parameter(
+            'merge_max_bottom_gap_ratio'
+        ).value
+        self.class_conflict_iou_threshold = self.get_parameter(
+            'class_conflict_iou_threshold'
+        ).value
+        self.class_conflict_shape_ratio = self.get_parameter(
+            'class_conflict_shape_ratio'
+        ).value
         device = self.get_parameter('device').get_parameter_value().string_value
         input_topic = self.get_parameter('input_topic').get_parameter_value().string_value
         camera_info_topic = self.get_parameter('camera_info_topic').get_parameter_value().string_value
@@ -284,6 +306,8 @@ class YoloDetector(Node):
                     'distance_m': dist_m,
                 })
 
+        frame_detections = self._resolve_person_two_wheeler_conflicts(frame_detections)
+        frame_detections = self._merge_person_with_two_wheeler(frame_detections)
         stable_detections = self._update_temporal_tracks(frame_detections)
 
         for item in stable_detections:
@@ -459,8 +483,155 @@ class YoloDetector(Node):
         union = area_a + area_b - intersection
         return intersection / union if union > 0.0 else 0.0
 
+    def _merge_person_with_two_wheeler(self, detections):
+        """관련된 사람과 이륜차를 안전 판단용 two_wheeler 한 박스로 결합한다.
+
+        단순히 가까운 보행자를 합치지 않도록 세로 겹침, 수평 간격, 바닥점
+        높이를 모두 확인한다. 각 사람은 가장 가까운 이륜차 하나에만 연결한다.
+        """
+        if not self.merge_person_two_wheeler:
+            return detections
+
+        two_indices = [
+            index for index, item in enumerate(detections)
+            if item['class_id'] == 1
+        ]
+        person_indices = [
+            index for index, item in enumerate(detections)
+            if item['class_id'] == 2
+        ]
+        if not two_indices or not person_indices:
+            return detections
+
+        assignments = {index: [] for index in two_indices}
+        assigned_people = set()
+
+        for person_index in person_indices:
+            px1, py1, px2, py2 = detections[person_index]['bbox']
+            person_width = max(1.0, px2 - px1)
+            person_height = max(1.0, py2 - py1)
+            person_center_x = (px1 + px2) / 2.0
+            best_two_index = None
+            best_score = float('inf')
+
+            for two_index in two_indices:
+                tx1, ty1, tx2, ty2 = detections[two_index]['bbox']
+                two_width = max(1.0, tx2 - tx1)
+                two_height = max(1.0, ty2 - ty1)
+                two_center_x = (tx1 + tx2) / 2.0
+
+                horizontal_gap = max(0.0, max(tx1 - px2, px1 - tx2))
+                vertical_overlap = max(0.0, min(py2, ty2) - max(py1, ty1))
+                vertical_overlap_ratio = vertical_overlap / min(person_height, two_height)
+                bottom_gap_ratio = abs(py2 - ty2) / max(person_height, two_height)
+                horizontal_gap_ratio = horizontal_gap / max(person_width, two_width)
+
+                if horizontal_gap_ratio > self.merge_max_horizontal_gap_ratio:
+                    continue
+                if vertical_overlap_ratio < self.merge_min_vertical_overlap_ratio:
+                    continue
+                if bottom_gap_ratio > self.merge_max_bottom_gap_ratio:
+                    continue
+
+                center_gap_ratio = abs(person_center_x - two_center_x) / max(
+                    person_width + two_width, 1.0
+                )
+                score = horizontal_gap_ratio + center_gap_ratio + bottom_gap_ratio
+                if score < best_score:
+                    best_score = score
+                    best_two_index = two_index
+
+            if best_two_index is not None:
+                assignments[best_two_index].append(person_index)
+                assigned_people.add(person_index)
+
+        merged = []
+        consumed_two = set()
+        for two_index, people in assignments.items():
+            if not people:
+                continue
+
+            members = [detections[two_index]] + [detections[index] for index in people]
+            x1 = min(item['bbox'][0] for item in members)
+            y1 = min(item['bbox'][1] for item in members)
+            x2 = max(item['bbox'][2] for item in members)
+            y2 = max(item['bbox'][3] for item in members)
+            confidence = max(item['confidence'] for item in members)
+            bbox = [x1, y1, x2, y2]
+            merged.append({
+                'class_id': 1,
+                'class_name': self.model.names[1],
+                'confidence': confidence,
+                'bbox': bbox,
+                'distance_m': self.estimate_distance(1, bbox),
+                'person_two_wheeler_merged': True,
+            })
+            consumed_two.add(two_index)
+
+        if not merged:
+            return detections
+
+        untouched = [
+            item for index, item in enumerate(detections)
+            if index not in assigned_people and index not in consumed_two
+        ]
+        return untouched + merged
+
+    def _resolve_person_two_wheeler_conflicts(self, detections):
+        """거의 동일한 박스의 person/two_wheeler 경쟁 검출은 person으로 정리한다.
+
+        실제 탑승 장면의 사람 박스와 차체 박스는 크기와 종횡비가 다르므로 여기서
+        제거하지 않고 뒤의 관계 병합 단계로 넘긴다.
+        """
+        suppressed_two = set()
+        people = [item for item in detections if item['class_id'] == 2]
+
+        for index, two in enumerate(detections):
+            if two['class_id'] != 1:
+                continue
+            tx1, ty1, tx2, ty2 = two['bbox']
+            tw = max(1.0, tx2 - tx1)
+            th = max(1.0, ty2 - ty1)
+
+            for person in people:
+                px1, py1, px2, py2 = person['bbox']
+                pw = max(1.0, px2 - px1)
+                ph = max(1.0, py2 - py1)
+                width_similarity = min(tw, pw) / max(tw, pw)
+                height_similarity = min(th, ph) / max(th, ph)
+
+                if self._bbox_iou(two['bbox'], person['bbox']) < self.class_conflict_iou_threshold:
+                    continue
+                if width_similarity < self.class_conflict_shape_ratio:
+                    continue
+                if height_similarity < self.class_conflict_shape_ratio:
+                    continue
+                if person['confidence'] < two['confidence'] * 0.75:
+                    continue
+
+                suppressed_two.add(index)
+                break
+
+        return [
+            item for index, item in enumerate(detections)
+            if index not in suppressed_two
+        ]
+
     def _update_temporal_tracks(self, detections):
         """연속 프레임 확인으로 순간 오검출과 짧은 검출 누락을 완화하고 거리를 스무딩한다."""
+        merged_boxes = [
+            item['bbox'] for item in detections
+            if item.get('person_two_wheeler_merged', False)
+        ]
+        if merged_boxes:
+            self.temporal_tracks = [
+                track for track in self.temporal_tracks
+                if not (
+                    track['class_id'] == 2
+                    and any(self._bbox_iou(track['bbox'], box) >= 0.20 for box in merged_boxes)
+                )
+            ]
+
         unmatched_tracks = set(range(len(self.temporal_tracks)))
 
         for detection in detections:

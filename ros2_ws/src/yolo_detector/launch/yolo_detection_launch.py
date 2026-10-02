@@ -23,8 +23,8 @@ def generate_launch_description():
 
     model_name_arg = DeclareLaunchArgument(
         'model_name',
-        default_value='models/futuredrive_yolo26n_hardneg_v2_best.pt',
-        description='YOLO 모델 이름 (yolov8n.pt, yolov8s.pt, yolov8m.pt 등)'
+        default_value='models/futuredrive_yolo26n_best.pt',
+        description='YOLO 모델 경로 (기본값: models/futuredrive_yolo26n_best.pt)'
     )
 
     frame_rate_arg = DeclareLaunchArgument(
@@ -102,8 +102,14 @@ def generate_launch_description():
             'two_wheeler_confidence': 0.30,
             'person_confidence': 0.30,
             'confirmation_frames': 2,
-            'max_missed_frames': 2,
-            'temporal_iou_threshold': 0.3,
+            'max_missed_frames': 0,
+            'temporal_iou_threshold': 0.15,
+            'merge_person_two_wheeler': False,
+            'merge_max_horizontal_gap_ratio': 0.35,
+            'merge_min_vertical_overlap_ratio': 0.20,
+            'merge_max_bottom_gap_ratio': 0.35,
+            'class_conflict_iou_threshold': 0.55,
+            'class_conflict_shape_ratio': 0.65,
             'device': LaunchConfiguration('device'),
             'input_topic': '/camera/image_raw',
             'max_det': 50,

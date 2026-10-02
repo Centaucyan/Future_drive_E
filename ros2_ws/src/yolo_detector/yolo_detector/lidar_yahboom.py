@@ -18,7 +18,7 @@ class YoloDetector(Node):
         super().__init__('yolo_detector')
 
         self.declare_parameter('video_source','0')
-        self.declare_parameter('model_name','models/futuredrive_yolo26n_hardneg_v2_best.pt')
+        self.declare_parameter('model_name','models/futuredrive_yolo26n_best.pt')
         self.declare_parameter('confidence_threshold',0.5)
         self.declare_parameter('device','cpu')
         self.declare_parameter('input_topic','/image_raw/compressed')
