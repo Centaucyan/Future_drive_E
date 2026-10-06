@@ -5,7 +5,7 @@ from dataclasses import asdict, dataclass
 @dataclass(frozen=True)
 class ViewerSettings:
     title: str = "퓨처드라이브 관제센터 · ROS Live"
-    rosbridge_url: str = "ws://localhost:9090"
+    rosbridge_url: str = ""
     control_api_url: str = "/api/control"
     platform_bridge_url: str = "http://127.0.0.1:8765"
     fixed_frame: str = "map"
