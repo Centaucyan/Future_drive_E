@@ -15,3 +15,4 @@ log/
 *.mp4
 .venv/
 *.webm
+runtime/
