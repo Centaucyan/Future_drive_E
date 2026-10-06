@@ -11,13 +11,14 @@ from cv_bridge import CvBridge
 from ultralytics import YOLO
 import numpy as np
 import cv2,json,time,math
+import struct
 
 class YoloDetector(Node):
     def __init__(self):
         super().__init__('yolo_detector')
 
         self.declare_parameter('video_source','0')
-        self.declare_parameter('model_name','models/futuredrive_yolo26n_hardneg_v2_best.pt')
+        self.declare_parameter('model_name','models/futuredrive_yolo26n_best.pt')
         self.declare_parameter('confidence_threshold',0.5)
         self.declare_parameter('device','cpu')
         self.declare_parameter('input_topic','/image_raw/compressed')
@@ -114,6 +115,7 @@ class YoloDetector(Node):
         end_idx=int((angle_max-scan.angle_min)/scan.angle_increment)
 
         distances=[]
+
         for i in range(start_idx,end_idx+1):
             if 0<=i<len(scan.ranges):
                 r=scan.ranges[i]
@@ -169,9 +171,9 @@ class YoloDetector(Node):
         json_detections=[]
         annotated_image=cv_image.copy()
 
-        if boxes is not None and len(boxes)>0:
-            collision_candidates = []
-                            
+        collision_candidates = []
+
+        if boxes is not None and len(boxes)>0:                                         
             for box in boxes:
                 x1,y1,x2,y2=box.xyxy[0].cpu().numpy()
                 cx=(x1+x2)/2.0
@@ -184,19 +186,20 @@ class YoloDetector(Node):
                 class_name=self.model.names[class_id]
 
                 distance=self.get_lidar_distance(cx,cv_image.shape[1])
+
                 monocular_distance=self.estimate_monocular_distance(
                     class_id,
                     [float(x1),float(y1),float(x2),float(y2)]
                 )
 
                 # 충돌 판단용 거리
-                warning_distance = distance if distance is not None else monocular_distance
+                warning_distance = distance
                 image_center = cv_image.shape[1] / 2.0
 
                 # 화면 중앙 ± 20% 정도를 전방 영역으로 설정
                 front_width = cv_image.shape[1] * 0.20
                 is_front = abs(cx - image_center) <= front_width
-                collision_distance_threshold = 1.0
+                collision_distance_threshold = 0.1
                 danger = (
                     is_front
                     and warning_distance is not None
@@ -296,8 +299,8 @@ class YoloDetector(Node):
                     cv2.FONT_HERSHEY_SIMPLEX,
                     0.6,(255,255,255),2
                 )
-
-            if collision_candidates:
+        
+        if collision_candidates:
                 most_dangerous = min(
                     collision_candidates,
                     key=lambda x: x['distance']
@@ -315,17 +318,18 @@ class YoloDetector(Node):
                 }, ensure_ascii=False)
 
                 self.collision_warning_pub.publish(warning_msg)
+                self.get_logger().warn(f'⚠️ 위험 감지! 물체: {most_dangerous["object_class"]}, 거리: {most_dangerous["distance"]:.2f}m, 속도: {most_dangerous["relative_speed"]:.2f}m/s')
 
-            else:
-                warning_msg = String()
-                warning_msg.data = json.dumps({
-                    'danger': False,
-                    'distance': -1.0,
-                    'relative_speed': 0.0,
-                    'object_class': ''
-                }, ensure_ascii=False)
+        else:
+            warning_msg = String()
+            warning_msg.data = json.dumps({
+                'danger': False,
+                'distance': -1.0,
+                'relative_speed': 0.0,
+                'object_class': ''
+            }, ensure_ascii=False)
 
-                self.collision_warning_pub.publish(warning_msg)
+            self.collision_warning_pub.publish(warning_msg)
 
         fps=1.0/inference_time if inference_time>0 else 0
         fps_text=f'FPS: {fps:.1f} | Objects: {len(json_detections)}'
@@ -376,6 +380,7 @@ class YoloDetector(Node):
         ]
         return colors[class_id%len(colors)]
 
+    
 def main(args=None):
     rclpy.init(args=args)
     node=YoloDetector()

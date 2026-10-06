@@ -26,14 +26,12 @@ class YoloDetector(Node):
         super().__init__("yolo_detector")
 
         # ── 파라미터 선언 ──
-        self.declare_parameter("video_source", "0")  # 웹캠 인덱스 또는 영상 파일 경로
-        self.declare_parameter(
-            "model_name", "models/futuredrive_yolo26n_aug_v1_best.pt"
-        )  # YOLO 학습모델 사용시 모델명 변경
-        self.declare_parameter("confidence_threshold", 0.5)  # 신뢰도 임계값
-        self.declare_parameter("device", "cpu")  # 'cpu' 또는 'cuda'
-        self.declare_parameter("input_topic", "/image_raw/compressed")
-        self.declare_parameter("max_det", 50)  # 최대 검출 수
+        self.declare_parameter('video_source', '0')     # 웹캠 인덱스 또는 영상 파일 경로
+        self.declare_parameter('model_name', 'models/futuredrive_yolo26n_best.pt')   # YOLO 학습모델 사용시 모델명 변경
+        self.declare_parameter('confidence_threshold', 0.5)     # 신뢰도 임계값
+        self.declare_parameter('device', 'cpu')                 # 'cpu' 또는 'cuda'
+        self.declare_parameter('input_topic', '/image_raw/compressed')
+        self.declare_parameter('max_det', 50)                   # 최대 검출 수
 
         # 파라미터 값 가져오기
         model_name = self.get_parameter("model_name").get_parameter_value().string_value
