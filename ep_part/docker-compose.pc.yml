@@ -1,0 +1,38 @@
+# 외부 PC 전용. 사용: docker compose -f docker-compose.pc.yml up slam
+services:
+  slam:
+    build:
+      context: .
+      dockerfile: Dockerfile.pc
+    image: ep_pc:latest
+    container_name: ep_slam
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=30
+    volumes:
+      - ./maps:/ep_ws/maps
+    command: ros2 launch my_robot_navigation slam.launch.py
+
+  rviz:
+    image: ep_pc:latest
+    container_name: ep_rviz
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=30
+      - DISPLAY=${DISPLAY}
+    volumes:
+      - /tmp/.X11-unix:/tmp/.X11-unix
+    command: rviz2
+    profiles: ["viewer"]
+
+  shell:
+    image: ep_pc:latest
+    container_name: ep_shell
+    network_mode: host
+    environment:
+      - ROS_DOMAIN_ID=30
+    volumes:
+      - ./maps:/ep_ws/maps
+    stdin_open: true
+    tty: true
+    profiles: ["shell"]
