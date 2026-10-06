@@ -4,7 +4,7 @@ from matplotlib import backend_managers
 from aiohttp import client_exceptions
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image,CompressedImage,LaserScan,PointCloud2,PointField
+from sensor_msgs.msg import Image,CompressedImage,LaserScan
 from vision_msgs.msg import Detection2DArray,Detection2D,ObjectHypothesisWithPose
 from std_msgs.msg import String
 from cv_bridge import CvBridge
@@ -88,7 +88,6 @@ class YoloDetector(Node):
         self.json_pub=self.create_publisher(String,'/yolo/detections_json',10)
         self.result_image_pub=self.create_publisher(Image,'/yolo/result_image',10)
         self.collision_warning_pub=self.create_publisher(String,'/collision_warning',10)
-        self.yolo_obstacle_pub = self.create_publisher(PointCloud2,'/yolo/obstacles',10)
 
         self.inference_count=0
         self.total_inference_time=0.0
@@ -172,7 +171,6 @@ class YoloDetector(Node):
         json_detections=[]
         annotated_image=cv_image.copy()
 
-        yolo_obstacles = []
         collision_candidates = []
 
         if boxes is not None and len(boxes)>0:                                         
@@ -188,22 +186,7 @@ class YoloDetector(Node):
                 class_name=self.model.names[class_id]
 
                 distance=self.get_lidar_distance(cx,cv_image.shape[1])
-                if distance is not None:
-                    camera_angle_deg = (
-                        (cx / cv_image.shape[1]) - 0.5
-                    ) * self.fov_x
 
-                    angle_rad = math.radians(
-                        camera_angle_deg + self.lidar_angle_offset_deg
-                    )
-
-                    obstacle_x = distance * math.cos(angle_rad)
-                    obstacle_y = distance * math.sin(angle_rad)
-
-                    yolo_obstacles.append(
-                        (obstacle_x, obstacle_y, 0.0)
-                    )
-                    
                 monocular_distance=self.estimate_monocular_distance(
                     class_id,
                     [float(x1),float(y1),float(x2),float(y2)]
@@ -216,7 +199,7 @@ class YoloDetector(Node):
                 # 화면 중앙 ± 20% 정도를 전방 영역으로 설정
                 front_width = cv_image.shape[1] * 0.20
                 is_front = abs(cx - image_center) <= front_width
-                collision_distance_threshold = 0.5
+                collision_distance_threshold = 0.1
                 danger = (
                     is_front
                     and warning_distance is not None
@@ -317,9 +300,6 @@ class YoloDetector(Node):
                     0.6,(255,255,255),2
                 )
         
-        obstacle_msg = self.create_yolo_obstacle_cloud(yolo_obstacles,msg.header.stamp)
-        self.yolo_obstacle_pub.publish(obstacle_msg)
-
         if collision_candidates:
                 most_dangerous = min(
                     collision_candidates,
@@ -400,50 +380,7 @@ class YoloDetector(Node):
         ]
         return colors[class_id%len(colors)]
 
-    # PointCloud2 생성
-    def create_yolo_obstacle_cloud(self, obstacles, stamp):
-        msg = PointCloud2()
-
-        msg.header.stamp = stamp
-        msg.header.frame_id = 'base_footprint'
-
-        msg.height = 1
-        msg.width = len(obstacles)
-
-        msg.fields = [
-            PointField(
-                name='x',
-                offset=0,
-                datatype=PointField.FLOAT32,
-                count=1
-            ),
-            PointField(
-                name='y',
-                offset=4,
-                datatype=PointField.FLOAT32,
-                count=1
-            ),
-            PointField(
-                name='z',
-                offset=8,
-                datatype=PointField.FLOAT32,
-                count=1
-            )
-        ]
-
-        msg.is_bigendian = False
-        msg.point_step = 12
-        msg.row_step = msg.point_step * msg.width
-
-        msg.data = b''.join(
-            struct.pack('<fff', x, y, z)
-            for x, y, z in obstacles
-        )
-
-        msg.is_dense = True
-
-        return msg
-
+    
 def main(args=None):
     rclpy.init(args=args)
     node=YoloDetector()
