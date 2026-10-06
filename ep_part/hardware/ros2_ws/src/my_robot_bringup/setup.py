@@ -28,6 +28,8 @@ setup(
     entry_points={
         'console_scripts': [
             'cmd_vel_serial_bridge = my_robot_bringup.cmd_vel_serial_bridge:main',
+            'avoidance_node = my_robot_bringup.avoidance_node:main',
+            'cmd_vel_bridge = my_robot_bringup.cmd_vel_bridge:main',
         ],
     },
 )

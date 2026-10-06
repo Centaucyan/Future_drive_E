@@ -1,35 +1,47 @@
 #!/usr/bin/env python3
 
-import os
-from launch import LaunchDescription
-from launch_ros.actions import Node
-from launch.substitutions import Command
+from configparser import ConfigParser
+from pathlib import Path
+
 from ament_index_python.packages import get_package_share_directory
+from launch import LaunchDescription
+from launch.conditions import IfCondition
+from launch_ros.actions import Node
+
+
+config_path = Path("/root/config.ini")
+
+if not config_path.is_file():
+    raise FileNotFoundError(f"설정 파일을 찾을 수 없습니다: {config_path}")
+
+config = ConfigParser()
+config.read(config_path)
+
+profile = config.get("robot", "profile", fallback="").strip().lower()
+
 
 def generate_launch_description():
-    # 1. 패키지 이름 설정: 우리가 만든 패키지 이름을 변수로 지정
+    # 패키지 이름과 설치된 공유 디렉토리 경로
     package_name = 'my_robot_bringup'
-    # 패키지가 설치된 실제 경로(공유 디렉토리)를 가져옵니다.
     pkg_share = get_package_share_directory(package_name)
 
-    # 3. RPLidar C1 드라이버 노드: 하드웨어 라이다로부터 데이터를 받아오는 역할
+    # hkit4 노드
     rplidar_cmd = Node(
         package='rplidar_ros',
         executable='rplidar_node',
         name='rplidar_node',
         parameters=[{
             'channel_type': 'serial',
-            'serial_port': '/dev/ttyUSB0', # 라이다가 연결된 USB 포트 (확인 결과 ttyUSB0)
-            'serial_baudrate': 460800,     # C1 모델의 통신 속도
-            'frame_id': 'laser_frame',           # 라이다 데이터의 기준점 이름 정의
-            'inverted': False,             # 라이다 설치 방향 반전 여부
-            'angle_compensate': True,      # 회전 속도에 따른 각도 보정 활성화
+            'serial_port': '/dev/ttyUSB0',
+            'serial_baudrate': 460800,
+            'frame_id': 'laser_frame',
+            'inverted': False,
+            'angle_compensate': True,
         }],
-        output='screen'
+        output='screen',
     )
 
-        # LiDAR 고정 TF
-    # 아래 6개 값은 실제 LiDAR 장착 위치와 각도로 변경해야 함.
+    # LiDAR 고정 TF
     laser_static_tf_node = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
@@ -58,12 +70,73 @@ def generate_launch_description():
         }],
     )
 
+    # hkit5 노드
+    avoidance_node = Node(
+        package=package_name,
+        executable='avoidance_node',
+        name='avoidance_node',
+        output='screen',
+        parameters=[{
+            'serial_port': '/dev/ttyACM0',
+            'baud_rate': 115200,
+            'require_sp': False,
+        }],
+    )
 
-    # 실행할 명령 목록(LaunchDescription) 생성 및 노드 추가
-    ld = LaunchDescription()
+    cmd_bridge_node = Node(
+        package=package_name,
+        executable='cmd_vel_bridge',
+        name='cmd_vel_bridge',
+        output='screen',
+        parameters=[{
+            'serial_port': '/dev/ttyACM0',
+        }],
+    )
 
-    ld.add_action(rplidar_cmd)      # 라이다 켜기
-    ld.add_action(laser_static_tf_node)   # 좌표 중심 잡기
-    ld.add_action(arduino_bridge_node)   # 좌표 중심 잡기
+    rplidar_cmd_2 = Node(
+        package='rplidar_ros',
+        executable='rplidar_node',
+        name='rplidar_node',
+        parameters=[{
+            'serial_port': '/dev/ttyUSB0',
+            'serial_baudrate': 115200,
+            'frame_id': 'lidar_frame',
+            'angle_compensate': True,
+        }],
+        output='screen',
+    )
 
-    return ld
+    laser_static_tf_node_2 = Node(
+        package='tf2_ros',
+        executable='static_transform_publisher',
+        arguments=[
+            '0.0',
+            '0.0',
+            '0.0',
+            '0.0',
+            '0.0',
+            '0.0',
+            'base_link',
+            'laser',
+        ],
+        condition=IfCondition('true'),
+    )
+
+    # 프로파일별 실행 노드 목록
+    ld_hkit4 = LaunchDescription()
+    ld_hkit4.add_action(rplidar_cmd)
+    ld_hkit4.add_action(laser_static_tf_node)
+    ld_hkit4.add_action(arduino_bridge_node)
+
+    ld_hkit5 = LaunchDescription()
+    ld_hkit5.add_action(avoidance_node)
+    ld_hkit5.add_action(rplidar_cmd_2)
+    ld_hkit5.add_action(laser_static_tf_node_2)
+    ld_hkit5.add_action(cmd_bridge_node)
+
+    if profile == "hkit4":
+        return ld_hkit4
+    elif profile == "hkit5":
+        return ld_hkit5
+    else:
+        raise ValueError(f"지원하지 않는 profile입니다: {profile!r}")
