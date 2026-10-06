@@ -23,7 +23,7 @@ class YoloDetector(Node):
     """YOLO 모델을 이용한 실시간 객체 검출 ROS2 노드"""
 
     def __init__(self):
-        super().__init__('yolo_detector')
+        super().__init__("yolo_detector")
 
         # ── 파라미터 선언 ──
         self.declare_parameter('video_source', '0')     # 웹캠 인덱스 또는 영상 파일 경로
@@ -34,12 +34,18 @@ class YoloDetector(Node):
         self.declare_parameter('max_det', 50)                   # 최대 검출 수
 
         # 파라미터 값 가져오기
-        model_name = self.get_parameter('model_name').get_parameter_value().string_value
-        self.conf_threshold = self.get_parameter('confidence_threshold').get_parameter_value().double_value
-        device = self.get_parameter('device').get_parameter_value().string_value
-        input_topic = self.get_parameter('input_topic').get_parameter_value().string_value
-        self.max_det = self.get_parameter('max_det').get_parameter_value().integer_value
-        video_source = self.get_parameter('video_source').value
+        model_name = self.get_parameter("model_name").get_parameter_value().string_value
+        self.conf_threshold = (
+            self.get_parameter("confidence_threshold")
+            .get_parameter_value()
+            .double_value
+        )
+        device = self.get_parameter("device").get_parameter_value().string_value
+        input_topic = (
+            self.get_parameter("input_topic").get_parameter_value().string_value
+        )
+        self.max_det = self.get_parameter("max_det").get_parameter_value().integer_value
+        video_source = self.get_parameter("video_source").value
 
         if str(video_source).isdigit():
             video_source = int(video_source)
@@ -47,52 +53,47 @@ class YoloDetector(Node):
         self.cap = cv2.VideoCapture(video_source)
 
         # ── YOLO 모델 로드 ──
-        self.get_logger().info(f'🔄 YOLO 모델 로딩 중: {model_name}')
+        self.get_logger().info(f"🔄 YOLO 모델 로딩 중: {model_name}")
         self.model = YOLO(model_name)
         self.model.to(device)
-        self.get_logger().info(f'✅ YOLO 모델 로드 완료 (디바이스: {device})')
+        self.get_logger().info(f"✅ YOLO 모델 로드 완료 (디바이스: {device})")
 
         # ── CvBridge 초기화 ──
         self.bridge = CvBridge()
 
         # ── 구독자: 카메라 이미지 ──
         self.subscription = self.create_subscription(
-            CompressedImage,
-            input_topic,
-            self.image_callback,
-            10
+            CompressedImage, input_topic, self.image_callback, 10
         )
-        self.get_logger().info(f'📥 구독 토픽: {input_topic}')
+        self.get_logger().info(f"📥 구독 토픽: {input_topic}")
 
         # ── 퍼블리셔: 검출 결과 ──
         # 1) Detection2DArray (표준 vision_msgs 형식)
         self.detection_pub = self.create_publisher(
-            Detection2DArray,
-            '/yolo/detections',
-            10
+            Detection2DArray, "/yolo/detections", 10
         )
 
         # 2) JSON 형식 검출 결과 (디버깅/간편 사용용)
-        self.json_pub = self.create_publisher(
-            String,
-            '/yolo/detections_json',
-            10
-        )
+        self.json_pub = self.create_publisher(String, "/yolo/detections_json", 10)
 
         # 3) 검출 결과 시각화 이미지
-        self.result_image_pub = self.create_publisher(
-            Image,
-            '/yolo/result_image',
-            10
+        self.result_image_pub = self.create_publisher(Image, "/yolo/result_image", 10)
+
+        # 4) 웹 표시용 JPEG 압축 이미지
+        self.result_compressed_image_pub = self.create_publisher(
+            CompressedImage, "/yolo/result_image/compressed", 10
         )
 
-        self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image')
+        self.get_logger().info(
+            "📤 발행 토픽: /yolo/detections, /yolo/detections_json, "
+            "/yolo/result_image, /yolo/result_image/compressed"
+        )
 
         # ── 통계 ──
         self.inference_count = 0
         self.total_inference_time = 0.0
 
-        self.get_logger().info('🚀 YoloDetector 노드 시작!')
+        self.get_logger().info("🚀 YoloDetector 노드 시작!")
 
     def image_callback(self, msg: Image):
         """카메라 이미지 수신 시 YOLO 추론 수행"""
@@ -104,16 +105,13 @@ class YoloDetector(Node):
                 self.get_logger().error("❌ CompressedImage 디코딩 실패")
                 return
         except Exception as e:
-            self.get_logger().error(f'❌ 이미지 변환 실패: {e}')
+            self.get_logger().error(f"❌ 이미지 변환 실패: {e}")
             return
 
         # ── YOLO 추론 ──
         start_time = time.time()
         results = self.model(
-            cv_image,
-            conf=self.conf_threshold,
-            max_det=self.max_det,
-            verbose=False
+            cv_image, conf=self.conf_threshold, max_det=self.max_det, verbose=False
         )
         inference_time = time.time() - start_time
 
@@ -162,56 +160,60 @@ class YoloDetector(Node):
                 detection_array_msg.detections.append(detection)
 
                 # JSON 결과 추가
-                json_detections.append({
-                    'class_id': class_id,
-                    'class_name': class_name,
-                    'confidence': round(confidence, 3),
-                    'bbox': {
-                        'x1': round(float(x1), 1),
-                        'y1': round(float(y1), 1),
-                        'x2': round(float(x2), 1),
-                        'y2': round(float(y2), 1),
-                    },
-                    'center': {
-                        'x': round(float(cx), 1),
-                        'y': round(float(cy), 1),
+                json_detections.append(
+                    {
+                        "class_id": class_id,
+                        "class_name": class_name,
+                        "confidence": round(confidence, 3),
+                        "bbox": {
+                            "x1": round(float(x1), 1),
+                            "y1": round(float(y1), 1),
+                            "x2": round(float(x2), 1),
+                            "y2": round(float(y2), 1),
+                        },
+                        "center": {
+                            "x": round(float(cx), 1),
+                            "y": round(float(cy), 1),
+                        },
                     }
-                })
+                )
 
                 # ── 시각화: 바운딩 박스 + 라벨 그리기 ──
                 color = self._get_color(class_id)
                 cv2.rectangle(
-                    annotated_image,
-                    (int(x1), int(y1)),
-                    (int(x2), int(y2)),
-                    color, 2
+                    annotated_image, (int(x1), int(y1)), (int(x2), int(y2)), color, 2
                 )
 
-                label = f'{class_name} {confidence:.2f}'
+                label = f"{class_name} {confidence:.2f}"
                 label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
                 cv2.rectangle(
                     annotated_image,
                     (int(x1), int(y1) - label_size[1] - 10),
                     (int(x1) + label_size[0], int(y1)),
-                    color, -1
+                    color,
+                    -1,
                 )
                 cv2.putText(
                     annotated_image,
                     label,
                     (int(x1), int(y1) - 5),
                     cv2.FONT_HERSHEY_SIMPLEX,
-                    0.6, (255, 255, 255), 2
+                    0.6,
+                    (255, 255, 255),
+                    2,
                 )
 
         # ── FPS 정보 표시 ──
         fps = 1.0 / inference_time if inference_time > 0 else 0
-        fps_text = f'FPS: {fps:.1f} | Objects: {len(json_detections)}'
+        fps_text = f"FPS: {fps:.1f} | Objects: {len(json_detections)}"
         cv2.putText(
             annotated_image,
             fps_text,
             (10, 30),
             cv2.FONT_HERSHEY_SIMPLEX,
-            0.8, (0, 255, 0), 2
+            0.8,
+            (0, 255, 0),
+            2,
         )
 
         # ── 토픽 발행 ──
@@ -220,40 +222,67 @@ class YoloDetector(Node):
 
         # JSON 결과 발행
         json_msg = String()
-        json_msg.data = json.dumps({
-            'timestamp': msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
-            'inference_time_ms': round(inference_time * 1000, 1),
-            'num_detections': len(json_detections),
-            'detections': json_detections
-        }, ensure_ascii=False)
+        json_msg.data = json.dumps(
+            {
+                "timestamp": msg.header.stamp.sec + msg.header.stamp.nanosec * 1e-9,
+                "inference_time_ms": round(inference_time * 1000, 1),
+                "num_detections": len(json_detections),
+                "detections": json_detections,
+            },
+            ensure_ascii=False,
+        )
         self.json_pub.publish(json_msg)
 
         # 시각화 이미지 발행
-        result_msg = self.bridge.cv2_to_imgmsg(annotated_image, encoding='bgr8')
+        result_msg = self.bridge.cv2_to_imgmsg(annotated_image, encoding="bgr8")
         result_msg.header = msg.header
         self.result_image_pub.publish(result_msg)
+
+        # 웹 표시용 JPEG 압축 이미지 발행
+        encoded_ok, encoded = cv2.imencode(".jpg", annotated_image)
+        if encoded_ok:
+            compressed_msg = CompressedImage()
+            compressed_msg.header = msg.header
+            compressed_msg.format = "jpeg"
+            compressed_msg.data = encoded.tobytes()
+            self.result_compressed_image_pub.publish(compressed_msg)
+        else:
+            self.get_logger().error("❌ YOLO 결과 이미지 JPEG 압축 실패")
 
         # 주기적 로그
         if self.inference_count % 30 == 0:
             avg_time = self.total_inference_time / self.inference_count
             self.get_logger().info(
-                f'📊 추론 #{self.inference_count} | '
-                f'검출: {len(json_detections)}개 | '
-                f'추론시간: {inference_time*1000:.1f}ms | '
-                f'평균: {avg_time*1000:.1f}ms | '
-                f'FPS: {1.0/avg_time:.1f}'
+                f"📊 추론 #{self.inference_count} | "
+                f"검출: {len(json_detections)}개 | "
+                f"추론시간: {inference_time*1000:.1f}ms | "
+                f"평균: {avg_time*1000:.1f}ms | "
+                f"FPS: {1.0/avg_time:.1f}"
             )
 
     def _get_color(self, class_id: int) -> tuple:
         """클래스 ID별 고유 색상 생성"""
         colors = [
-            (255, 0, 0), (0, 255, 0), (0, 0, 255),
-            (255, 255, 0), (255, 0, 255), (0, 255, 255),
-            (128, 0, 0), (0, 128, 0), (0, 0, 128),
-            (128, 128, 0), (128, 0, 128), (0, 128, 128),
-            (255, 128, 0), (255, 0, 128), (128, 255, 0),
-            (0, 255, 128), (128, 0, 255), (0, 128, 255),
-            (255, 128, 128), (128, 255, 128),
+            (255, 0, 0),
+            (0, 255, 0),
+            (0, 0, 255),
+            (255, 255, 0),
+            (255, 0, 255),
+            (0, 255, 255),
+            (128, 0, 0),
+            (0, 128, 0),
+            (0, 0, 128),
+            (128, 128, 0),
+            (128, 0, 128),
+            (0, 128, 128),
+            (255, 128, 0),
+            (255, 0, 128),
+            (128, 255, 0),
+            (0, 255, 128),
+            (128, 0, 255),
+            (0, 128, 255),
+            (255, 128, 128),
+            (128, 255, 128),
         ]
         return colors[class_id % len(colors)]
 
@@ -265,11 +294,11 @@ def main(args=None):
     try:
         rclpy.spin(node)
     except KeyboardInterrupt:
-        node.get_logger().info('🛑 사용자에 의해 종료됨')
+        node.get_logger().info("🛑 사용자에 의해 종료됨")
     finally:
         node.destroy_node()
         rclpy.shutdown()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()

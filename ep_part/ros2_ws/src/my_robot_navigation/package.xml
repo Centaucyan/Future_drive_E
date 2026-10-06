@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>my_robot_navigation</name>
+  <version>0.0.1</version>
+  <description>SLAM (slam_toolbox) launch and config</description>
+  <maintainer email="ep@example.com">EP team</maintainer>
+  <license>MIT</license>
+
+  <exec_depend>slam_toolbox</exec_depend>
+  <exec_depend>nav2_map_server</exec_depend>
+
+  <export>
+    <build_type>ament_python</build_type>
+  </export>
+</package>

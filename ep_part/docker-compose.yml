@@ -1,0 +1,17 @@
+services:
+  robot:
+    build: .
+    image: ep_robot:latest
+    container_name: ep_robot
+    network_mode: host            # 다른 팀/PC와 ROS2 DDS 통신
+    devices:
+      - /dev/ttyACM0:/dev/ttyACM0 # OpenCR
+      # 라이다 연결 후 아래 줄 주석 해제 (장치가 없으면 컨테이너가 안 뜸)
+      # - /dev/ttyUSB0:/dev/ttyUSB0
+      # 카메라 사용 시 주석 해제 (장치가 없으면 컨테이너가 안 뜸)
+      # - /dev/video0:/dev/video0
+    environment:
+      - ROS_DOMAIN_ID=30
+    restart: unless-stopped
+    command: ros2 launch my_robot_bringup robot.launch.py require_sp:=false
+    # 라이다 사용 시: ... robot.launch.py require_sp:=false lidar:=true

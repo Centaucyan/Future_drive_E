@@ -14,5 +14,6 @@ install/
 log/
 *.mp4
 .venv/
+app/runtime/
 *.webm
 runtime/
