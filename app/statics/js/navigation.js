@@ -15,9 +15,16 @@ export class Navigation {
     this.active = null;
     this.pendingStop = null;
     this.sawRunning = false;
+    this.remoteBusy = false;
   }
-  get busy() { return Boolean(this.active || this.pendingStop); }
+  get busy() { return Boolean(this.active || this.pendingStop || this.remoteBusy); }
   get ready() { return Boolean(this.controlApi); }
+  setRemoteBusy(value) {
+    const next = Boolean(value);
+    if (this.remoteBusy === next) return;
+    this.remoteBusy = next;
+    this.changed();
+  }
   connectPlatform(url) {
     this.controlApi = (url || '').replace(/\/+$/, '');
     this.changed();
@@ -80,18 +87,25 @@ export class Navigation {
   }
   sync(status) {
     const value = String(status?.status || '').toLowerCase();
-    if (!this.active) return;
     if (['active', 'accepted', 'executing', 'running', 'navigating'].includes(value)) {
+      const changed = !this.remoteBusy;
       this.sawRunning = true;
-      this.report('자율주행 중');
-    } else if (this.sawRunning && ['idle', 'succeeded', 'completed', 'success'].includes(value)) {
+      this.remoteBusy = true;
+      if (changed) {
+        this.report('자율주행 중');
+        this.changed();
+      }
+    } else if (['idle', 'succeeded', 'completed', 'success'].includes(value)) {
+      const wasBusy = this.busy;
       this.active = null;
       this.sawRunning = false;
-      this.report('목적지 도착 또는 주행 종료');
-      this.changed();
+      this.remoteBusy = false;
+      if (wasBusy) this.report('목적지 도착 또는 주행 종료');
+      if (wasBusy) this.changed();
     } else if (['failed', 'aborted', 'canceled', 'cancelled'].includes(value)) {
       this.active = null;
       this.sawRunning = false;
+      this.remoteBusy = false;
       this.report(`주행 종료: ${value}`);
       this.changed();
     }
@@ -101,5 +115,6 @@ export class Navigation {
     this.active = null;
     this.pendingStop = null;
     this.sawRunning = false;
+    this.remoteBusy = false;
   }
 }

@@ -125,6 +125,7 @@ http://<브리지-PC-IP>:8765
 | 위치 추정 | `/amcl_pose` |
 | 초기 위치 | `/initialpose` |
 | Nav2 액션 | `/navigate_to_pose` |
+| Nav2 주행 상태 복구 | `/navigate_to_pose/_action/status` |
 | 정지 속도 | `/cmd_vel` |
 | 배터리 | `/battery` |
 
