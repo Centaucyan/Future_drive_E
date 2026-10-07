@@ -29,7 +29,7 @@ def generate_launch_description():
             '-configuration_directory',
             os.path.join(package_share, 'params'),
             '-configuration_basename',
-            'futuredrive_cartographer.lua',
+            'futuredrive_hkit.lua',
         ],
         remappings=[
             ('scan', '/scan'),

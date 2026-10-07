@@ -109,17 +109,17 @@ def generate_launch_description():
     laser_static_tf_node_2 = Node(
         package='tf2_ros',
         executable='static_transform_publisher',
+        name='base_link_to_lidar_frame',
         arguments=[
-            '0.0',
-            '0.0',
-            '0.0',
-            '0.0',
-            '0.0',
-            '0.0',
-            'base_link',
-            'laser',
+            '--x', '0',
+            '--y', '0',
+            '--z', '0',
+            '--yaw', '0',
+            '--pitch', '0',
+            '--roll', '0',
+            '--frame-id', 'base_link',
+            '--child-frame-id', 'lidar_frame',
         ],
-        condition=IfCondition('true'),
     )
 
     # 프로파일별 실행 노드 목록

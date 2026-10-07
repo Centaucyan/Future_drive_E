@@ -5,15 +5,13 @@ options = {
   map_builder = MAP_BUILDER,
   trajectory_builder = TRAJECTORY_BUILDER,
 
-  -- TF:
-  -- map -> odom -> base_link -> laser_frame
+  -- Cartographer가 map -> odom을 발행하고,
+  -- 기존 브리지가 odom -> base_link를 발행
   map_frame = "map",
   tracking_frame = "base_link",
   published_frame = "odom",
   odom_frame = "odom",
 
-  -- 기존 브리지에서 odom -> base_link를 발행하므로
-  -- Cartographer는 map -> odom만 발행한다.
   provide_odom_frame = false,
   publish_frame_projected_to_2d = false,
 
@@ -41,16 +39,14 @@ options = {
 
 MAP_BUILDER.use_trajectory_builder_2d = true
 
--- 현재 IMU를 사용하지 않음
 TRAJECTORY_BUILDER_2D.use_imu_data = false
 
--- RPLidar C1
+-- /scan 기준: range_min=0.15 m, range_max=12.0 m
 TRAJECTORY_BUILDER_2D.num_accumulated_range_data = 1
-TRAJECTORY_BUILDER_2D.min_range = 0.12
+TRAJECTORY_BUILDER_2D.min_range = 0.15
 TRAJECTORY_BUILDER_2D.max_range = 12.0
 TRAJECTORY_BUILDER_2D.missing_data_ray_length = 5.0
 
--- 소형 이동 로봇과 휠 오도메트리용 설정
 TRAJECTORY_BUILDER_2D.use_online_correlative_scan_matching = true
 
 TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.linear_search_window =
@@ -65,11 +61,9 @@ TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.translation_delta_cost_
 TRAJECTORY_BUILDER_2D.real_time_correlative_scan_matcher.rotation_delta_cost_weight =
     0.1
 
--- 서브맵 설정
 TRAJECTORY_BUILDER_2D.submaps.num_range_data = 45
 TRAJECTORY_BUILDER_2D.submaps.grid_options_2d.resolution = 0.05
 
--- 루프 클로저와 pose graph 최적화
 POSE_GRAPH.optimize_every_n_nodes = 35
 POSE_GRAPH.constraint_builder.min_score = 0.65
 POSE_GRAPH.constraint_builder.global_localization_min_score = 0.7
