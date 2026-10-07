@@ -33,7 +33,12 @@ python3 -m pip install ~~~
 
 ### SP Part
 ```bash
-python3 -m pip install ~~~
+python3 -m pip install \
+numpy==1.26.4 \
+ultralytics==8.4.164 \
+opencv-python==4.10.0.84 \
+torch==2.14.0 \
+torchvision==0.29.0
 ```
  
 ### EP Part
