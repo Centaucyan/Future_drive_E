@@ -259,6 +259,8 @@ map → odom → base_link → lidar_frame
 
 ## 필수 패키지 — Ubuntu PC
 
+프로젝트 실행에 필요한 ROS 2 패키지와 Python 시리얼 통신 라이브러리를 설치합니다.
+
 ```bash
 sudo apt update
 
@@ -268,7 +270,25 @@ sudo apt install -y \
   ros-humble-rviz2 \
   ros-humble-nav2-map-server \
   ros-humble-vision-msgs \
+  ros-humble-usb-cam \
+  ros-humble-compressed-image-transport \
+  ros-humble-rplidar-ros \
   python3-serial
+```
+
+ROS 2 Humble 환경을 현재 터미널에 적용합니다.
+
+```bash
+source /opt/ros/humble/setup.bash
+```
+
+새 터미널에서도 ROS 2 환경이 자동으로 적용되도록 `.bashrc`에 추가합니다.
+
+```bash
+grep -qxF 'source /opt/ros/humble/setup.bash' ~/.bashrc || \
+echo 'source /opt/ros/humble/setup.bash' >> ~/.bashrc
+
+source ~/.bashrc
 ```
 
 ## 차량 패키지
