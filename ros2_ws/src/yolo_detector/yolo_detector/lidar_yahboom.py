@@ -1,21 +1,51 @@
 #!/usr/bin/env python3
-from networkx.generators import spectral_graph_forge
-from matplotlib import backend_managers
-from aiohttp import client_exceptions
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image,CompressedImage,LaserScan
-from vision_msgs.msg import Detection2DArray,Detection2D,ObjectHypothesisWithPose
-from std_msgs.msg import String
-from cv_bridge import CvBridge
-from ultralytics import YOLO
+
+import json
+import math
+import time
+
+import cv2
 import numpy as np
-import cv2,json,time,math
-import struct
+import rclpy
+from cv_bridge import CvBridge
+from rclpy.node import Node
+from sensor_msgs.msg import CompressedImage, Image, LaserScan
+from std_msgs.msg import String
+from ultralytics import YOLO
+from vision_msgs.msg import (
+    Detection2D,
+    Detection2DArray,
+    ObjectHypothesisWithPose,
+)
 
 class YoloDetector(Node):
     def __init__(self):
         super().__init__('yolo_detector')
+
+        # 클래스마다 오검출 특성이 다르므로
+        # 객체 종류별로 서로 다른 confidence 기준을 사용한다.
+        self.declare_parameter('four_wheeler_confidence', 0.75)
+        self.declare_parameter('two_wheeler_confidence', 0.35)
+        self.declare_parameter('person_confidence', 0.40)
+
+        # 모델 클래스 ID에 해당하는 최소 confidence 기준값
+        self.class_thresholds = {
+            0: float(
+                self.get_parameter(
+                    'four_wheeler_confidence'
+                ).value
+            ),
+            1: float(
+                self.get_parameter(
+                    'two_wheeler_confidence'
+                ).value
+            ),
+            2: float(
+                self.get_parameter(
+                    'person_confidence'
+                ).value
+            ),
+        }
 
         self.declare_parameter('video_source','0')
         self.declare_parameter('model_name','models/futuredrive_yolo26n_best.pt')
@@ -155,10 +185,14 @@ class YoloDetector(Node):
             self.get_logger().error(f'❌ 이미지 변환 실패: {e}')
             return
 
-        start_time=time.time()
-        results=self.model(
+        # 클래스별 기준 중 가장 낮은 값으로 YOLO 후보를 먼저 받는다.
+        # 이후 아래 박스 반복문에서 클래스별 기준을 다시 적용한다.
+        min_confidence = min(self.class_thresholds.values())
+
+        start_time = time.time()
+        results = self.model(
             cv_image,
-            conf=self.conf_threshold,
+            conf=min_confidence,
             max_det=self.max_det,
             verbose=False
         )
@@ -185,9 +219,22 @@ class YoloDetector(Node):
                 w=x2-x1
                 h=y2-y1
 
-                class_id=int(box.cls[0].cpu().numpy())
-                confidence=float(box.conf[0].cpu().numpy())
-                class_name=self.model.names[class_id]
+                class_id = int(box.cls[0].cpu().numpy())
+                confidence = float(box.conf[0].cpu().numpy())
+
+                # 현재 검출 객체의 클래스별 confidence 기준을 가져온다.
+                # 등록되지 않은 클래스는 기존 공통 기준값을 사용한다.
+                threshold = self.class_thresholds.get(
+                    class_id,
+                    self.conf_threshold
+                )
+
+                # 클래스별 기준보다 confidence가 낮으면
+                # 거리 계산과 토픽 발행에서 제외한다.
+                if confidence < threshold:
+                    continue
+
+                class_name = self.model.names[class_id]
 
                 distance=self.get_lidar_distance(cx,cv_image.shape[1])
 
@@ -201,7 +248,7 @@ class YoloDetector(Node):
                 if distance is None:
                     warning_distance = monocular_distance
                     distance_source='M'
-                elif distance > monocular_distance + lidar_monocular_threshold:
+                elif distance > monocular_distance + self.lidar_monocular_threshold:
                     warning_distance = monocular_distance
                     distance_source='M'
                 else:
@@ -216,7 +263,7 @@ class YoloDetector(Node):
                 danger = (
                     is_front
                     and warning_distance is not None
-                    and warning_distance < collision_distance_threshold
+                    and warning_distance < self.collision_distance_threshold
                 )
                 
                 # 상대속도 계산
