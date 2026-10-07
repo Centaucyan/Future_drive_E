@@ -49,8 +49,8 @@ def generate_launch_description():
         output='screen',
         arguments=[
             '--x', '0.0',
-            '--y', '0.0',
-            '--z', '0.0',
+            '--y', '0.08',
+            '--z', '0.13',
             '--roll', '0.0',
             '--pitch', '0.0',
             '--yaw', '0.0',
@@ -111,9 +111,9 @@ def generate_launch_description():
         executable='static_transform_publisher',
         name='base_link_to_lidar_frame',
         arguments=[
-            '--x', '0',
-            '--y', '0',
-            '--z', '0',
+            '--x', '0.03',
+            '--y', '0.09',
+            '--z', '0.11',
             '--yaw', '0',
             '--pitch', '0',
             '--roll', '0',
