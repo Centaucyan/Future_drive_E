@@ -122,7 +122,7 @@ class YoloDetector(Node):
         self.inference_count=0
         self.total_inference_time=0.0
 
-        self.collision_distance_threshold = 0.5
+        self.collision_distance_threshold = 0.2
         self.lidar_monocular_threshold = 2.0
 
         self.get_logger().info(f'📥 구독 토픽: {input_topic}')

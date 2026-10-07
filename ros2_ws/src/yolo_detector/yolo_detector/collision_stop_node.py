@@ -98,7 +98,7 @@ class CollisionStopNode(Node):
                 # danger=false이면 마지막 Nav2 명령 전달
                 self.cmd_vel_pub.publish(self.last_cmd)
 
-        self.ex_danger = self.danger
+            self.ex_danger = self.danger
 
         except json.JSONDecodeError:
             self.get_logger().error(
