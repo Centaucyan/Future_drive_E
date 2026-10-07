@@ -12,6 +12,7 @@ import {
 import {
   OrbitControls
 } from '../vendor/OrbitControls.js';
+import { PlatformConnection } from './platform.js';
 
 // 기본 도우미와 로봇별 연결 설정을 준비한다.
 const $ = id => document.getElementById(id);
@@ -23,7 +24,7 @@ try {
   if (response.ok) serverConfig = await response.json();
 } catch {}
 const defaults = {
-  url: '',
+  platformUrl: serverConfig.platform_bridge_url || '',
   controlApi: '',
   fixed: serverConfig.fixed_frame || 'map',
   base: serverConfig.base_frame || 'base_footprint',
@@ -46,10 +47,12 @@ let profiles = [{
   name: 'Robot 1'
 }, {
   ...defaults,
-  name: 'Robot 2'
+  name: 'Robot 2',
+  platformUrl: ''
 }, {
   ...defaults,
-  name: 'Robot 3'
+  name: 'Robot 3',
+  platformUrl: ''
 }];
 try {
   const saved = JSON.parse(localStorage.getItem('yahboom-viewer-v1'));
@@ -66,7 +69,7 @@ try {
   });
 } catch {}
 const demo = new URLSearchParams(location.search).has('demo');
-let selectedMode = localStorage.getItem('yahboom-selected') || '1';
+let selectedMode = localStorage.getItem('yahboom-selected') || '0';
 if (!['0', '1', '2', 'all'].includes(selectedMode)) selectedMode = '1';
 
 // Three.js 장면, 카메라, 조명과 기준 격자를 구성한다.
@@ -165,6 +168,8 @@ function createRobotState(index) {
     epoch: 0,
     last: {},
     messages: {},
+    topicStatus: {},
+    platformSnapshot: null,
     transforms: new Map(),
     mapMesh: null,
     mapFitted: false,
@@ -296,6 +301,11 @@ function receive(state, key, message) {
     state.cameraUrl = imageUrl(message);
     if (isVisible(state)) renderCameras();
   }
+  if (key === 'platformCamera') {
+    state.cameraUrl = message.url;
+    state.last.camera = Date.now();
+    if (isVisible(state)) renderCameras();
+  }
 }
 
 function resetState(state, {
@@ -323,6 +333,8 @@ function resetState(state, {
   state.groups.robot.visible = false;
   state.last = {};
   state.messages = {};
+  state.topicStatus = {};
+  state.platformSnapshot = null;
   state.transforms.clear();
   state.mapMesh = null;
   state.mapFitted = false;
@@ -340,62 +352,7 @@ function closeState(state, {
   state.root.visible = false;
 }
 
-// 로봇별 ROS 토픽 구독과 WebSocket 연결 생명주기를 관리한다.
-function subscribeState(state, token) {
-  const p = profiles[state.index],
-    types = {
-      map: 'nav_msgs/msg/OccupancyGrid',
-      scan: 'sensor_msgs/msg/LaserScan',
-      path: 'nav_msgs/msg/Path',
-      odom: 'nav_msgs/msg/Odometry',
-      tf: 'tf2_msgs/msg/TFMessage',
-      static: 'tf2_msgs/msg/TFMessage',
-      camera: 'sensor_msgs/msg/CompressedImage',
-      description: 'std_msgs/msg/String',
-      amcl: 'geometry_msgs/msg/PoseWithCovarianceStamped',
-      battery: 'std_msgs/msg/UInt16'
-    };
-  for (const [key, type] of Object.entries(types)) {
-    if (!p[key]) continue;
-    const connection = state.ros,
-      id = `viewer:${state.index}:${token}:${key}`,
-      handler = message => {
-        if (token !== state.epoch) return;
-        try {
-          receive(state, key, message);
-        } catch (error) {
-          $('notice').textContent = `${robotName(state.index)} ${key}: ${error.message}`;
-        }
-      };
-    connection.on(p[key], handler);
-    const latched = ['map', 'static', 'description', 'amcl'].includes(key);
-    connection.callOnConnection({
-      op: 'subscribe',
-      id,
-      topic: p[key],
-      type,
-      throttle_rate: key === 'camera' ? 150 : key === 'scan' ? 100 : 0,
-      queue_length: 1,
-      qos: {
-        history: 'keep_last',
-        depth: key === 'static' ? 100 : 5,
-        reliability: latched ? 'reliable' : 'best_effort',
-        durability: latched ? 'transient_local' : 'volatile'
-      }
-    });
-    state.subscriptions.push({
-      unsubscribe() {
-        connection.removeListener(p[key], handler);
-        if (connection.isConnected) connection.callOnConnection({
-          op: 'unsubscribe',
-          id,
-          topic: p[key]
-        });
-      }
-    });
-  }
-}
-
+// 로봇별 Autonomy Studio 상태 스트림 연결 생명주기를 관리한다.
 function connectState(state) {
   const p = profiles[state.index];
   state.root.visible = true;
@@ -403,52 +360,36 @@ function connectState(state) {
     if (state.demoTimer) return;
     state.status = '테스트 데이터';
     state.demoTimer = startDemo((key, message) => receive(state, key, message));
-    fetch('/static/robot_models/yahboom_vehicle/yahboom.urdf').then(r => r.text()).then(text =>
-      loadModel(state, text));
+    fetch('/static/robot_models/yahboom_vehicle/yahboom.urdf').then(r => r.text()).then(text => loadModel(state, text));
     return;
   }
   if (state.ros && (state.ros.isConnected || state.status === '연결 중…')) return;
-  resetState(state, {
-    closeNavigation: false
-  });
+  resetState(state, {closeNavigation: false});
   state.root.visible = true;
   const token = ++state.epoch;
-  if (!p.url) {
-    state.status = '연결 주소 미설정';
-    return;
-  }
-  if (!/^wss?:\/\//.test(p.url)) {
-    state.status = '잘못된 WebSocket 주소';
+  if (!p.platformUrl || !/^https?:\/\//.test(p.platformUrl)) {
+    state.status = '플랫폼 주소 미설정';
     return;
   }
   state.status = '연결 중…';
-  state.ros = new ROSLIB.Ros({
-    url: p.url
-  });
-  state.navigation.connect(p.url, p);
-  state.ros.on('connection', () => {
+  p.controlApi = p.platformUrl.replace(/\/+$/, '');
+  state.navigation.connectPlatform(p.controlApi);
+  state.ros = new PlatformConnection(p.platformUrl, (key, message) => {
     if (token !== state.epoch) return;
-    state.status = '● 연결됨';
-    subscribeState(state, token);
-    renderConnection();
+    try { receive(state, key, message); }
+    catch (error) { $('notice').textContent = `${robotName(state.index)} ${key}: ${error.message}`; }
+  }, {
+    open() { if (token !== state.epoch) return; state.status = '● 연결됨'; renderConnection(); updateGoalButtons(); },
+    close() { if (token !== state.epoch) return; state.status = '연결 끊김'; navigationReport(`${robotName(state.index)} 플랫폼 연결 끊김`); renderConnection(); updateGoalButtons(); },
+    error() { if (token !== state.epoch) return; state.status = '연결 실패'; $('notice').textContent = `${robotName(state.index)} Autonomy Studio 브리지 주소를 확인하세요.`; renderConnection(); },
+    snapshot(snapshot) {
+      state.topicStatus = snapshot.topic_status || {};
+      state.platformSnapshot = snapshot;
+      state.navigation.sync(snapshot.navigation);
+    },
+    messageError(error) { $('notice').textContent = `${robotName(state.index)} 플랫폼 데이터 오류: ${error.message}`; }
   });
-  state.ros.on('error', () => {
-    if (token !== state.epoch) return;
-    state.status = '연결 실패';
-    $('notice').textContent = `${robotName(state.index)} rosbridge 실행 여부와 주소를 확인하세요.`;
-    renderConnection();
-  });
-  state.ros.on('close', () => {
-    if (token !== state.epoch) return;
-    state.status = '연결 끊김';
-    selectionMode(false);
-    navigationReport(`${robotName(state.index)} 연결 끊김 · 로봇 상태를 확인하세요.`);
-    renderConnection();
-  });
-  state.ros.on('status', status => {
-    if (token === state.epoch && status.level === 'error') $('notice').textContent =
-      `${robotName(state.index)} · ${status.msg}`;
-  });
+  state.ros.connect();
 }
 
 function reconcileConnections() {
@@ -468,9 +409,9 @@ function renderConnection() {
   const states = activeIndices().map(index => robotStates[index]);
   $('connection').textContent = selectedMode === 'all' ? states.map(state =>
     `R${state.index+1} ${state.status.replace('● ','')}`).join(' · ') : states[0].status;
-  if (states.some(state => !profiles[state.index].url) && !demo) $('notice').textContent =
-    selectedMode === 'all' ? '연결 설정에서 Robot 1과 Robot 2의 rosbridge를 먼저 준비하세요.' :
-    '연결 설정에서 이 로봇의 rosbridge 주소를 입력하세요.';
+  if (states.some(state => !profiles[state.index].platformUrl) && !demo) $('notice').textContent =
+    selectedMode === 'all' ? '연결 설정에서 Robot 1과 Robot 2의 플랫폼 브리지를 먼저 준비하세요.' :
+    '연결 설정에서 이 로봇의 플랫폼 브리지 주소를 입력하세요.';
 }
 
 // 단일 로봇/ALL 모드 선택과 연결 설정 화면을 처리한다.
@@ -504,23 +445,9 @@ function renderRobots() {
 }
 
 const fields = {
-  url: 'rosbridge 주소',
-  controlApi: '플랫폼 제어 API (선택)',
+  platformUrl: 'Autonomy Studio 브리지 주소',
   fixed: '기준 좌표계',
-  base: '기체 좌표계',
-  map: '지도 토픽',
-  scan: '라이다 토픽',
-  path: '계획 경로 토픽',
-  odom: '속도 토픽',
-  tf: 'TF 토픽',
-  static: '고정 TF 토픽',
-  camera: '압축 카메라 토픽',
-  description: '기체 URDF 토픽',
-  amcl: '위치 추정 응답 토픽',
-  action: 'Nav2 액션',
-  cmd: '정지 속도 토픽',
-  initialpose: '초기 위치 토픽',
-  battery: '배터리 토픽'
+  base: '기체 좌표계'
 };
 $('settings').onclick = () => {
   if (selectedMode === 'all') {
@@ -539,7 +466,7 @@ $('settings').onclick = () => {
     const input = document.createElement('input');
     input.name = key;
     input.value = p[key];
-    if (key === 'url') input.placeholder = 'ws://192.168.0.x:9090';
+    if (key === 'platformUrl') input.placeholder = 'http://브리지-PC-IP:8765';
     element.append(input);
     return element;
   }));
@@ -549,16 +476,15 @@ $('cancel').onclick = () => $('configDialog').close();
 $('configForm').onsubmit = event => {
   event.preventDefault();
   if (selectedMode === 'all') return;
-  const state = primaryState(),
-    p = profiles[state.index];
+  const state = primaryState(), p = profiles[state.index];
   for (const [key, value] of new FormData(event.target)) p[key] = String(value).trim();
-  if (!/^wss?:\/\//.test(p.url)) {
-    navigationReport('rosbridge 주소는 ws:// 또는 wss://로 시작해야 합니다.');
+  if (!/^https?:\/\//.test(p.platformUrl)) {
+    navigationReport('플랫폼 브리지 주소는 http:// 또는 https://로 시작해야 합니다.');
     state.status = '연결 설정 실패';
     renderConnection();
     return;
   }
-  p.controlApi = '';
+  p.controlApi = p.platformUrl.replace(/\/+$/, '');
   localStorage.setItem('yahboom-viewer-v1', JSON.stringify(profiles));
   $('configDialog').close();
   closeState(state);
@@ -585,7 +511,7 @@ function fit() {
   const tf = transform(state, message.header.frame_id);
   if (!tf) return;
   const center = new T.Vector3(message.info.width * message.info.resolution / 2, message.info
-      .height * message.info.resolution / 2, 0).applyMatrix4(message.mapOrigin).applyMatrix4(tf),
+      .height * message.info.resolution / 2, 0).applyMatrix4(state.messages.mapOrigin).applyMatrix4(tf),
     span = Math.max(message.info.width, message.info.height) * message.info.resolution;
   controls.target.copy(center);
   camera.position.copy(center).add(new T.Vector3(0, -.01, Math.max(span * 1.4, 3)));
@@ -939,25 +865,43 @@ function mapsMatch() {
 function updateDashboard() {
   const states = activeIndices().map(index => robotStates[index]),
     all = selectedMode === 'all';
-  $('topicStatus').replaceChildren(...states.flatMap(state => ['map', 'scan', 'path', 'odom', 'tf',
-    'amcl', 'camera'
-  ].map(key => {
-    const element = document.createElement('span'),
-      age = state.last[key] ? (Date.now() - state.last[key]) / 1000 : Infinity,
-      label = {
-        map: '지도',
-        scan: '라이다',
-        path: '경로',
-        odom: '속도',
-        tf: 'TF',
-        amcl: '위치',
-        camera: '카메라'
-      } [key];
-    element.textContent =
-      `${all?`R${state.index+1} `:''}${label} · ${age===Infinity?'대기':age<3?'수신 중':`${Math.floor(age)}초 전`}`;
-    element.className = age < 3 ? 'live' : '';
-    return element;
-  })));
+  const topicDefinitions = [
+    {key: 'scan', fallback: '/scan', mode: 'live'},
+    {key: 'odom', fallback: '/odom', mode: 'live'},
+    {key: 'map', fallback: '/map', mode: 'latched'},
+    {key: 'plan', fallback: '/plan', mode: 'endpoint'},
+    {key: 'amcl_pose', fallback: '/amcl_pose', mode: 'live', receivedKey: 'amcl'},
+    {key: 'tf', fallback: '/tf', mode: 'live'},
+    {key: 'camera_image', fallback: '/image_raw/compressed', mode: 'live', receivedKey: 'camera'},
+    {key: 'cmd_vel', fallback: '/cmd_vel', mode: 'endpoint'},
+    {key: 'navigate_to_pose', fallback: '/navigate_to_pose', mode: 'endpoint'}
+  ];
+  const topicRows = states.flatMap(state => topicDefinitions.map(definition => {
+    const info = state.topicStatus[definition.key] || {};
+    const receivedKey = definition.receivedKey || ({plan: 'path'}[definition.key] || definition.key);
+    const last = state.last[receivedKey] || 0;
+    const age = last ? (Date.now() - last) / 1000 : Infinity;
+    const connected = demo || state.ros?.isConnected;
+    const available = info.available === true || (!(definition.key in state.topicStatus) && age < 3);
+    let level = 'bad', text = '미수신';
+    if (!connected) text = '연결 끊김';
+    else if (demo) { level = age < 3 ? 'ok' : 'wait'; text = age < 3 ? '테스트 수신' : '대기'; }
+    else if (definition.mode === 'live') {
+      const bridgeReported = definition.key in state.topicStatus;
+      if (info.available === true) { level = 'ok'; text = age < 3 ? '정상' : 'ROS 수신 중'; }
+      else if (bridgeReported) { level = 'bad'; text = '미수신'; }
+      else if (age < 3) { level = 'ok'; text = '정상'; }
+      else if (last) { level = 'warn'; text = `${Math.floor(age)}초 전 · 지연`; }
+    } else if (definition.mode === 'latched') {
+      if (available || last) { level = 'ok'; text = '수신됨'; }
+    } else if (available) { level = 'ok'; text = '사용 가능'; }
+    const row = document.createElement('div');
+    row.className = `topic-row ${level}`;
+    const name = info.name || definition.fallback;
+    row.innerHTML = `<code>${all?`R${state.index+1} `:''}${name}</code><b>${level==='ok'?'●':level==='warn'?'▲':'×'} ${text}</b>`;
+    return row;
+  }));
+  $('topicStatus').replaceChildren(...topicRows);
   const speed = state => {
       const value = state.messages.odom?.twist?.twist?.linear;
       return value && Date.now() - state.last.odom < 3000 ? Math.hypot(value.x, value.y).toFixed(

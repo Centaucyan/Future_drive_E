@@ -1,6 +1,6 @@
 # 야붐카 ROS 웹 뷰어
 
-ROS 2 Humble 기반 야붐카의 지도, 위치, 경로, 라이다, TF, 카메라와 상태 정보를 표시하는 FastAPI 웹 애플리케이션입니다. 웹에서 로봇별 rosbridge WebSocket 주소를 설정해 연결합니다.
+ROS 2 Humble 기반 야붐카의 지도, 위치, 경로, 라이다, TF, 카메라와 상태 정보를 표시하는 FastAPI 웹 애플리케이션입니다. 웹에서 로봇별 Autonomy Studio 브리지 주소를 설정해 지도·라이다·위치·경로와 제어 기능을 직접 연결합니다.
 
 ## 주요 기능
 
@@ -11,49 +11,36 @@ ROS 2 Humble 기반 야붐카의 지도, 위치, 경로, 라이다, TF, 카메�
 - 배터리 전압 기반 추정 잔량
 - 지도에서 초기 위치와 목적지 선택
 - Nav2 자율주행 요청과 정지
-- 로봇 3대의 개별 rosbridge 연결 설정
+- 로봇 3대의 Autonomy Studio 브리지 개별 연결
 - Robot 1·2 동시 연결과 별도 URDF/TF 표시를 제공하는 ALL 보기
 - ALL 보기의 이중 카메라와 두 로봇 동시 정지
 
 ## 시스템 구성
 
-이 시스템은 로봇 PC와 웹 서버 PC를 분리해서 실행합니다.
+Autonomy Studio가 제공하는 상태·제어 브리지를 웹에서 직접 사용합니다.
 
-- **로봇 PC**: ROS 2 토픽을 rosbridge WebSocket(`9090/tcp`)으로 제공합니다.
+- **Autonomy Studio PC**: 지도·라이다·위치·경로를 `8765/ws/state`로 제공하고 초기 위치·목적지·정지 HTTP API를 제공합니다.
 - **웹 서버 PC**: FastAPI 웹 화면을 `8081/tcp`로 제공합니다.
-- **사용자 브라우저**: 웹 화면에 접속한 뒤 각 로봇 PC의 rosbridge 주소로 직접 연결합니다.
+- **사용자 브라우저**: 로봇별 플랫폼 브리지 주소에 연결합니다. 별도 rosbridge 실행과 ROS Domain ID 입력은 필요하지 않습니다.
 
-따라서 웹 서버 PC뿐 아니라 웹 화면을 사용하는 팀원 PC에서도 각 로봇 PC의 `9090/tcp`에 접근할 수 있어야 합니다.
+## 1. 로봇 데이터 준비
 
-## 1. 로봇 PC 설정
-
-ROS 2 Humble이 설치된 각 로봇 PC에서 rosbridge를 설치합니다.
+Autonomy Studio에서 로봇을 연결하고 Map, Localization, Planning, Vehicle, Camera 모듈을 실행합니다. 시각화 창은 열지 않아도 됩니다. 그다음 같은 PC에서 프로젝트의 독립 브리지를 실행합니다.
 
 ```bash
-sudo apt update
-sudo apt install -y ros-humble-rosbridge-server
+cd ~/Future_drive_E
+bash app/management/start-platform-bridge.sh
 ```
+
+스크립트는 Autonomy Studio가 해당 로봇 연결 때 생성한 최신 Fast DDS peer 프로필을 사용합니다. 최초 프로필 생성과 ROS 모듈 실행까지는 Autonomy Studio가 필요합니다.
+
+브리지 상태는 다음 명령으로 확인합니다.
 
 ```bash
-source /opt/ros/humble/setup.bash
-ros2 pkg prefix rosbridge_server
+curl http://127.0.0.1:8765/health
 ```
 
-로봇의 ROS 모듈을 실행한 뒤 rosbridge WebSocket을 시작합니다.
-
-```bash
-ros2 launch rosbridge_server rosbridge_websocket_launch.xml \
-  address:=0.0.0.0 \
-  port:=9090
-```
-
-로봇 PC에서 UFW를 사용한다면 같은 LAN의 팀원 PC가 접속할 수 있도록 포트를 허용합니다.
-
-```bash
-sudo ufw allow 9090/tcp
-```
-
-`source /opt/ros/humble/setup.bash`와 rosbridge 실행은 새 터미널을 열거나 로봇 PC를 재시작한 뒤 다시 수행해야 합니다. `address:=0.0.0.0`은 rosbridge를 네트워크에 공개하므로 신뢰할 수 있는 내부망에서만 사용하세요.
+`has_map`, `has_scan`, `has_pose`가 `true`이면 해당 데이터를 웹에서 받을 수 있습니다. 다른 PC의 브라우저가 연결하려면 플랫폼 PC의 `8765/tcp`에 접근할 수 있어야 합니다.
 
 ## 2. 웹 서버 PC 설치
 
@@ -61,7 +48,7 @@ sudo ufw allow 9090/tcp
 
 ```bash
 sudo apt update
-sudo apt install -y python3-venv ros-humble-rosbridge-server
+sudo apt install -y python3-venv
 
 cd ~/Future_drive_E
 python3 -m venv app/.venv
@@ -90,23 +77,27 @@ sudo ufw allow 8081/tcp
 웹 서버는 기본적으로 `0.0.0.0:8081`에서 실행됩니다.
 
 - 웹 서버 PC 자체에서 접속: `http://127.0.0.1:8081/`
-- 같은 LAN의 팀원 PC에서 접속: `http://192.168.0.14:8081/`
-- 오프라인 데모: `http://192.168.0.14:8081/?demo=1`
+- 같은 LAN의 팀원 PC에서 접속: `http://<웹-서버-PC-IP>:8081/`
+- 오프라인 데모: `http://<웹-서버-PC-IP>:8081/?demo=1`
 
 
 > 현재 웹 애플리케이션에는 사용자 인증이나 관리자/일반 사용자 권한 구분이 없습니다. 위 두 주소는 권한이 다른 주소가 아니라 접속 위치만 다릅니다.
 
 ## 웹에서 로봇 연결
 
-1. Autonomy Studio 등에서 로봇의 Map, Localization, Planning, Vehicle 모듈을 실행합니다.
-2. 해당 로봇 PC에서 rosbridge가 `0.0.0.0:9090`으로 실행 중인지 확인합니다.
+1. Autonomy Studio에서 로봇을 연결하고 필요한 모듈을 실행합니다.
+2. 해당 PC에서 `start-platform-bridge.sh`를 실행합니다.
 3. 웹 상단에서 연결할 로봇을 선택합니다.
-4. **연결 설정**에서 해당 로봇 PC의 주소(`ws://<로봇 PC LAN IP>:9090`)를 입력합니다.
+4. **연결 설정**에서 로봇 모듈을 실행 중인 PC의 브리지 주소를 입력합니다.
 5. **저장 및 연결**을 누릅니다.
 
-예를 들어 로봇 PC의 LAN IP가 `192.168.0.20`이면 `ws://192.168.0.20:9090`을 입력합니다. `ALL` 보기를 사용하려면 먼저 Robot 1과 Robot 2에 각각 올바른 rosbridge 주소를 저장해야 합니다.
+```text
+http://<브리지-PC-IP>:8765
+```
 
-각 로봇의 rosbridge 주소는 브라우저 로컬 저장소에 개별 저장됩니다. HTTPS로 웹을 제공하는 경우에는 브라우저 보안 정책에 맞춰 `wss://` 주소가 필요합니다.
+같은 PC에서 Autonomy Studio와 브라우저를 실행한다면 `http://127.0.0.1:8765`도 사용할 수 있습니다. 중앙 웹에서 여러 로봇을 동시에 보려면 각 로봇을 실행하는 플랫폼 PC의 LAN 주소를 Robot 1·2·3에 각각 저장합니다.
+
+웹은 `/ws/state`에서 지도·라이다·위치·경로를 받고, `/initialpose`, `/navigate_to_pose`, `/cancel_navigation`, `/stop`으로 제어 요청을 보냅니다. `ALL` 보기를 사용하려면 Robot 1과 Robot 2의 브리지 주소를 먼저 저장해야 합니다.
 
 ## 주요 파일과 실행 로그
 
@@ -115,10 +106,12 @@ sudo ufw allow 8081/tcp
 - `app/controllers/web_controller.py`: 화면·제어·연결 관리 API
 - `app/statics/js/app.js`: ROS 구독·3D 화면·연결 UI
 - `app/statics/js/navigation.js`: 초기 위치·주행·정지
+- `app/management/start-platform-bridge.sh`: 독립 상태·제어 브리지 실행
+- `app/management/status-platform-bridge.sh`: 브리지 상태 확인
+- `app/management/stop-platform-bridge.sh`: 브리지 종료
 - `app/management/start-web.sh`: FastAPI 웹 서버 실행
-- `app/management/start-bridge.sh`: rosbridge 실행 보조 스크립트
 
-## 기본 ROS 토픽
+## 플랫폼에서 사용하는 기본 ROS 토픽
 
 | 기능 | 토픽 |
 |---|---|
@@ -135,7 +128,7 @@ sudo ufw allow 8081/tcp
 | 정지 속도 | `/cmd_vel` |
 | 배터리 | `/battery` |
 
-초기 위치는 선택한 rosbridge를 통해 `/initialpose`로 전송합니다. 목적지는 `/navigate_to_pose`, 정지는 Nav2 목표 취소와 `/cmd_vel` 속도 0으로 전송합니다.
+초기 위치는 플랫폼 브리지의 `/initialpose`, 목적지는 `/navigate_to_pose`, 정지는 `/cancel_navigation`과 `/stop` API로 전송합니다.
 
 ALL 보기는 Robot 1과 Robot 2의 기존 연결 상태를 재사용합니다. 단독 보기에서 주행 중인 로봇을 ALL로 전환해도 해당 WebSocket과 Navigation 객체를 닫지 않으며, 다른 로봇 연결만 추가합니다. ALL에서는 새로운 초기 위치·목적지·주행 명령을 비활성화하고 정지 버튼만 두 로봇에 전달합니다. 두 `/map` 메시지의 frame ID, 해상도, 크기, 원점을 비교해 공통 좌표계 여부도 화면에 표시합니다.
 
