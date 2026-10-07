@@ -11,6 +11,9 @@ RUN apt-get update && apt-get install -y \
     python3-serial \
     && rm -rf /var/lib/apt/lists/*
 
+ENV LANG=en_US.UTF-8
+ENV LC_ALL=en_US.UTF-8
+
 # ROS 2 환경 설정을 .bashrc에 등록
 RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc
 

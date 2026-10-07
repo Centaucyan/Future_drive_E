@@ -8,5 +8,5 @@ docker run -it \
   --mount type=bind,src="$CONFIG",dst=/root/config.ini,readonly \
   -v /dev:/dev \
   -w /root \
-  ros:humble \
+  ros:humble_ep_v01 \
   /bin/bash
