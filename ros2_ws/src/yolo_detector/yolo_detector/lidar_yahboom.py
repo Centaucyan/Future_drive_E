@@ -92,6 +92,9 @@ class YoloDetector(Node):
         self.inference_count=0
         self.total_inference_time=0.0
 
+        self.collision_distance_threshold = 0.5
+        self.lidar_monocular_threshold = 2.0
+
         self.get_logger().info(f'📥 구독 토픽: {input_topic}')
         self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image, /collision_warning')
         self.get_logger().info('🚀 YoloDetector 노드 시작!')
@@ -125,6 +128,7 @@ class YoloDetector(Node):
         return min(distances) if distances else None
 
     def estimate_monocular_distance(self,class_id,bbox):
+        """ 단안 거리 추정 함수 """
         x1,y1,x2,y2=bbox
         h_px=max(1.0,y2-y1)
         real_h=self.real_heights.get(class_id,1.0)
@@ -193,13 +197,22 @@ class YoloDetector(Node):
                 )
 
                 # 충돌 판단용 거리
-                warning_distance = distance
+                # 라이다 거리 없거나 값이 너무 클 때 단안 거리 사용
+                if distance is None:
+                    warning_distance = monocular_distance
+                    distance_source='M'
+                elif distance > monocular_distance + lidar_monocular_threshold:
+                    warning_distance = monocular_distance
+                    distance_source='M'
+                else:
+                    warning_distance = distance
+                    distance_source='L'
+
                 image_center = cv_image.shape[1] / 2.0
 
                 # 화면 중앙 ± 20% 정도를 전방 영역으로 설정
                 front_width = cv_image.shape[1] * 0.20
                 is_front = abs(cx - image_center) <= front_width
-                collision_distance_threshold = 0.5
                 danger = (
                     is_front
                     and warning_distance is not None
@@ -215,19 +228,18 @@ class YoloDetector(Node):
 
                 if (warning_distance is not None
                     and track_key in self.previous_distances):
-                    previous_distance, previous_time = self.previous_distances[track_key]
+                    previous_distance, previous_time, previous_source = self.previous_distances[track_key]
 
                     dt = current_time - previous_time
 
-                    if dt > 0.001:
-                        relative_speed = (  
-                            warning_distance - previous_distance
-                        ) / dt
+                    if dt > 0.001 and previous_source==distance_source:
+                        relative_speed = (warning_distance - previous_distance)/dt
 
                 if warning_distance is not None:
                     self.previous_distances[track_key] = (
                         warning_distance,
-                        current_time
+                        current_time,
+                        distance_source
                     )
 
                 # 위험 객체만 후보에 저장
@@ -235,7 +247,8 @@ class YoloDetector(Node):
                     collision_candidates.append({
                         'distance': warning_distance,
                         'relative_speed': relative_speed,
-                        'object_class': class_name
+                        'object_class': class_name,
+                        'distance_source':distance_source
                     })
 
                 # Detection 처리                
@@ -266,7 +279,9 @@ class YoloDetector(Node):
                         'y':round(float(cy),1)
                     },
                     'lidar_distance_m':round(distance,2) if distance is not None else None,
-                    'monocular_distance_m':round(monocular_distance,2)
+                    'monocular_distance_m':round(monocular_distance,2),
+                    'warning_distance_m':round(warning_distance,2) if warning_distance is not None else None,
+                    'distance_source':distance_source
                 })
 
                 color=self._get_color(class_id)
@@ -281,6 +296,7 @@ class YoloDetector(Node):
                 if distance is not None:
                     label+=f' | L:{distance:.2f}m'
                 label+=f' | M:{monocular_distance:.2f}m'
+                label+=f' | W:{warning_distance:.2f}m({distance_source})'
 
                 label_size,_=cv2.getTextSize(
                     label,cv2.FONT_HERSHEY_SIMPLEX,0.6,2)
@@ -308,13 +324,10 @@ class YoloDetector(Node):
                 warning_msg = String()
                 warning_msg.data = json.dumps({
                     'danger': True,
-                    'distance': round(
-                        float(most_dangerous['distance']), 2
-                    ),
-                    'relative_speed': round(
-                        float(most_dangerous['relative_speed']), 2
-                    ),
-                    'object_class': most_dangerous['object_class']
+                    'distance': round(float(most_dangerous['distance']), 2),
+                    'relative_speed': round(float(most_dangerous['relative_speed']), 2),
+                    'object_class': most_dangerous['object_class'],
+                    'distance_source':most_dangerous['distance_source']
                 }, ensure_ascii=False)
 
                 self.collision_warning_pub.publish(warning_msg)
