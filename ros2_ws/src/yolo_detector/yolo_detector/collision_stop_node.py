@@ -12,6 +12,7 @@ class CollisionStopNode(Node):
 
         # 현재 충돌 위험 상태
         self.danger = False
+        self.ex_danger = False
 
         # 마지막으로 받은 Nav2 속도 명령
         self.last_cmd = Twist()
@@ -66,6 +67,8 @@ class CollisionStopNode(Node):
         """
         lidar_yahboom.py에서 보내는 JSON을 처리한다.
         """
+        self.ex_danger = self.danger
+        
 
         try:
             data = json.loads(msg.data)
@@ -88,9 +91,11 @@ class CollisionStopNode(Node):
                 self.publish_stop()
 
             else:
-                self.get_logger().info(
-                    '✅ 충돌 위험 해제'
-                )
+                if self.ex_danger == True and self.danger == False:
+                    self.get_logger().info(
+                        '✅ 충돌 위험 해제'
+                    )
+
 
                 # danger=false이면 마지막 Nav2 명령 전달
                 self.cmd_vel_pub.publish(self.last_cmd)
