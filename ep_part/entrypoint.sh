@@ -1,4 +1,4 @@
-CONFIG=/home/hkit5/config.ini
+CONFIG=$HOME/config.ini
 test -f "$CONFIG" || { echo "설정 파일이 없습니다: $CONFIG"; exit 1; }
 
 docker run -it --rm \
