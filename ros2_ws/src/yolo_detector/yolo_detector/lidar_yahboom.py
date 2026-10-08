@@ -1,21 +1,51 @@
 #!/usr/bin/env python3
-from networkx.generators import spectral_graph_forge
-from matplotlib import backend_managers
-from aiohttp import client_exceptions
-import rclpy
-from rclpy.node import Node
-from sensor_msgs.msg import Image,CompressedImage,LaserScan
-from vision_msgs.msg import Detection2DArray,Detection2D,ObjectHypothesisWithPose
-from std_msgs.msg import String
-from cv_bridge import CvBridge
-from ultralytics import YOLO
+
+import json
+import math
+import time
+
+import cv2
 import numpy as np
-import cv2,json,time,math
-import struct
+import rclpy
+from cv_bridge import CvBridge
+from rclpy.node import Node
+from sensor_msgs.msg import CompressedImage, Image, LaserScan
+from std_msgs.msg import String
+from ultralytics import YOLO
+from vision_msgs.msg import (
+    Detection2D,
+    Detection2DArray,
+    ObjectHypothesisWithPose,
+)
 
 class YoloDetector(Node):
     def __init__(self):
         super().__init__('yolo_detector')
+
+        # 클래스마다 오검출 특성이 다르므로
+        # 객체 종류별로 서로 다른 confidence 기준을 사용한다.
+        self.declare_parameter('four_wheeler_confidence', 0.75)
+        self.declare_parameter('two_wheeler_confidence', 0.35)
+        self.declare_parameter('person_confidence', 0.40)
+
+        # 모델 클래스 ID에 해당하는 최소 confidence 기준값
+        self.class_thresholds = {
+            0: float(
+                self.get_parameter(
+                    'four_wheeler_confidence'
+                ).value
+            ),
+            1: float(
+                self.get_parameter(
+                    'two_wheeler_confidence'
+                ).value
+            ),
+            2: float(
+                self.get_parameter(
+                    'person_confidence'
+                ).value
+            ),
+        }
 
         self.declare_parameter('video_source','0')
         self.declare_parameter('model_name','models/futuredrive_yolo26n_best.pt')
@@ -87,13 +117,17 @@ class YoloDetector(Node):
         self.detection_pub=self.create_publisher(Detection2DArray,'/yolo/detections',10)
         self.json_pub=self.create_publisher(String,'/yolo/detections_json',10)
         self.result_image_pub=self.create_publisher(Image,'/yolo/result_image',10)
+        self.result_compressed_image_pub = self.create_publisher(CompressedImage, "/yolo/result_image/compressed", 10)
         self.collision_warning_pub=self.create_publisher(String,'/collision_warning',10)
 
         self.inference_count=0
         self.total_inference_time=0.0
 
+        self.collision_distance_threshold = 0.2
+        self.lidar_monocular_threshold = 2.0
+
         self.get_logger().info(f'📥 구독 토픽: {input_topic}')
-        self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image, /collision_warning')
+        self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image, /yolo/result_image/compressed, /collision_warning')
         self.get_logger().info('🚀 YoloDetector 노드 시작!')
 
     def scan_callback(self,msg):
@@ -125,6 +159,7 @@ class YoloDetector(Node):
         return min(distances) if distances else None
 
     def estimate_monocular_distance(self,class_id,bbox):
+        """ 단안 거리 추정 함수 """
         x1,y1,x2,y2=bbox
         h_px=max(1.0,y2-y1)
         real_h=self.real_heights.get(class_id,1.0)
@@ -151,10 +186,14 @@ class YoloDetector(Node):
             self.get_logger().error(f'❌ 이미지 변환 실패: {e}')
             return
 
-        start_time=time.time()
-        results=self.model(
+        # 클래스별 기준 중 가장 낮은 값으로 YOLO 후보를 먼저 받는다.
+        # 이후 아래 박스 반복문에서 클래스별 기준을 다시 적용한다.
+        min_confidence = min(self.class_thresholds.values())
+
+        start_time = time.time()
+        results = self.model(
             cv_image,
-            conf=self.conf_threshold,
+            conf=min_confidence,
             max_det=self.max_det,
             verbose=False
         )
@@ -181,9 +220,22 @@ class YoloDetector(Node):
                 w=x2-x1
                 h=y2-y1
 
-                class_id=int(box.cls[0].cpu().numpy())
-                confidence=float(box.conf[0].cpu().numpy())
-                class_name=self.model.names[class_id]
+                class_id = int(box.cls[0].cpu().numpy())
+                confidence = float(box.conf[0].cpu().numpy())
+
+                # 현재 검출 객체의 클래스별 confidence 기준을 가져온다.
+                # 등록되지 않은 클래스는 기존 공통 기준값을 사용한다.
+                threshold = self.class_thresholds.get(
+                    class_id,
+                    self.conf_threshold
+                )
+
+                # 클래스별 기준보다 confidence가 낮으면
+                # 거리 계산과 토픽 발행에서 제외한다.
+                if confidence < threshold:
+                    continue
+
+                class_name = self.model.names[class_id]
 
                 distance=self.get_lidar_distance(cx,cv_image.shape[1])
 
@@ -193,17 +245,26 @@ class YoloDetector(Node):
                 )
 
                 # 충돌 판단용 거리
-                warning_distance = distance
+                # 라이다 거리 없거나 값이 너무 클 때 단안 거리 사용
+                if distance is None:
+                    warning_distance = monocular_distance
+                    distance_source='M'
+                elif distance > monocular_distance + self.lidar_monocular_threshold:
+                    warning_distance = monocular_distance
+                    distance_source='M'
+                else:
+                    warning_distance = distance
+                    distance_source='L'
+
                 image_center = cv_image.shape[1] / 2.0
 
                 # 화면 중앙 ± 20% 정도를 전방 영역으로 설정
                 front_width = cv_image.shape[1] * 0.20
                 is_front = abs(cx - image_center) <= front_width
-                collision_distance_threshold = 0.1
                 danger = (
                     is_front
                     and warning_distance is not None
-                    and warning_distance < collision_distance_threshold
+                    and warning_distance < self.collision_distance_threshold
                 )
                 
                 # 상대속도 계산
@@ -215,19 +276,18 @@ class YoloDetector(Node):
 
                 if (warning_distance is not None
                     and track_key in self.previous_distances):
-                    previous_distance, previous_time = self.previous_distances[track_key]
+                    previous_distance, previous_time, previous_source = self.previous_distances[track_key]
 
                     dt = current_time - previous_time
 
-                    if dt > 0.001:
-                        relative_speed = (  
-                            warning_distance - previous_distance
-                        ) / dt
+                    if dt > 0.001 and previous_source==distance_source:
+                        relative_speed = (warning_distance - previous_distance)/dt
 
                 if warning_distance is not None:
                     self.previous_distances[track_key] = (
                         warning_distance,
-                        current_time
+                        current_time,
+                        distance_source
                     )
 
                 # 위험 객체만 후보에 저장
@@ -235,7 +295,8 @@ class YoloDetector(Node):
                     collision_candidates.append({
                         'distance': warning_distance,
                         'relative_speed': relative_speed,
-                        'object_class': class_name
+                        'object_class': class_name,
+                        'distance_source':distance_source
                     })
 
                 # Detection 처리                
@@ -266,7 +327,9 @@ class YoloDetector(Node):
                         'y':round(float(cy),1)
                     },
                     'lidar_distance_m':round(distance,2) if distance is not None else None,
-                    'monocular_distance_m':round(monocular_distance,2)
+                    'monocular_distance_m':round(monocular_distance,2),
+                    'warning_distance_m':round(warning_distance,2) if warning_distance is not None else None,
+                    'distance_source':distance_source
                 })
 
                 color=self._get_color(class_id)
@@ -281,6 +344,7 @@ class YoloDetector(Node):
                 if distance is not None:
                     label+=f' | L:{distance:.2f}m'
                 label+=f' | M:{monocular_distance:.2f}m'
+                label+=f' | W:{warning_distance:.2f}m({distance_source})'
 
                 label_size,_=cv2.getTextSize(
                     label,cv2.FONT_HERSHEY_SIMPLEX,0.6,2)
@@ -308,13 +372,10 @@ class YoloDetector(Node):
                 warning_msg = String()
                 warning_msg.data = json.dumps({
                     'danger': True,
-                    'distance': round(
-                        float(most_dangerous['distance']), 2
-                    ),
-                    'relative_speed': round(
-                        float(most_dangerous['relative_speed']), 2
-                    ),
-                    'object_class': most_dangerous['object_class']
+                    'distance': round(float(most_dangerous['distance']), 2),
+                    'relative_speed': round(float(most_dangerous['relative_speed']), 2),
+                    'object_class': most_dangerous['object_class'],
+                    'distance_source':most_dangerous['distance_source']
                 }, ensure_ascii=False)
 
                 self.collision_warning_pub.publish(warning_msg)
@@ -353,10 +414,21 @@ class YoloDetector(Node):
         },ensure_ascii=False)
         self.json_pub.publish(json_msg)
 
-        result_msg=self.bridge.cv2_to_imgmsg(
-            annotated_image,encoding='bgr8')
-        result_msg.header=msg.header
+        result_msg = self.bridge.cv2_to_imgmsg(annotated_image, encoding="bgr8")
+        result_msg.header = msg.header
         self.result_image_pub.publish(result_msg)
+
+        # 압축 이미지 발행
+        encoded_ok, encoded = cv2.imencode(".jpg", annotated_image)
+        if encoded_ok:
+            compressed_msg = CompressedImage()
+            compressed_msg.header = msg.header
+            compressed_msg.format = "jpeg"
+            compressed_msg.data = encoded.tobytes()
+            self.result_compressed_image_pub.publish(compressed_msg)
+        else:
+            self.get_logger().error("❌ YOLO 결과 이미지 JPEG 압축 실패")
+
 
         if self.inference_count%30==0:
             avg_time=self.total_inference_time/self.inference_count

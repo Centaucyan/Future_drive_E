@@ -16,7 +16,8 @@ export async function buildModel(text){
    if(box)shape=new T.BoxGeometry(...nums(box.getAttribute('size'),'1 1 1'));
    else if(cyl){shape=new T.CylinderGeometry(+cyl.getAttribute('radius'),+cyl.getAttribute('radius'),+cyl.getAttribute('length'),24);shape.rotateX(Math.PI/2);}
    else if(sphere)shape=new T.SphereGeometry(+sphere.getAttribute('radius'),24,16);
-   else if(mesh){const path=mesh.getAttribute('filename');if(!/^package:\/\/yahboom_vehicle\/meshes\/[\w.-]+\.stl$/i.test(path)){result.missing++;continue;}try{shape=await loader.loadAsync('/static/robot_models/'+path.slice('package://'.length));}catch{result.missing++;continue;}}
+   // STL 하나를 읽지 못해도 전체 URDF 모델 로딩을 중단하지 않고 해당 메시만 누락 처리한다.
+   else if(mesh){const path=mesh.getAttribute('filename');if(!/^package:\/\/yahboom_vehicle\/meshes\/[\w.-]+\.stl$/i.test(path)){result.missing++;continue;}try{shape=await loader.loadAsync('/static/robot_models/'+path.slice('package://'.length));}catch(error){console.warn(`URDF 메시 로드 실패 (${path}):`,error);result.missing++;continue;}}
    else{result.missing++;continue;}
    const material=visual.querySelector('material');let color=material?.querySelector('color');if(!color&&material?.getAttribute('name'))color=Array.from(xml.querySelectorAll('robot > material')).find(m=>m.getAttribute('name')===material.getAttribute('name'))?.querySelector('color');
    const rgba=nums(color?.getAttribute('rgba'),'.9 .6 .1 1');const object=new T.Mesh(shape,new T.MeshStandardMaterial({color:new T.Color(...rgba.slice(0,3)),opacity:rgba[3],transparent:rgba[3]<1}));object.applyMatrix4(origin(visual.querySelector('origin')));if(mesh)object.scale.set(...nums(mesh.getAttribute('scale'),'1 1 1'));group.add(object);
