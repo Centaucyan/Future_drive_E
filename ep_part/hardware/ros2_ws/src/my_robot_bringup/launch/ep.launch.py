@@ -92,14 +92,7 @@ def generate_launch_description():
             'serial_port': '/dev/ttyACM0',
         }],
     )
-    
-    camera_node = Node(
-    package=package_name,
-    executable='camera_node',
-    name='camera_publisher',
-    output='screen',
-    )
-    
+
     rplidar_cmd_2 = Node(
         package='rplidar_ros',
         executable='rplidar_node',
@@ -127,6 +120,13 @@ def generate_launch_description():
             '--frame-id', 'base_link',
             '--child-frame-id', 'lidar_frame',
         ],
+    )
+    
+    camera_node = Node(
+    package=package_name,
+    executable='camera_node',
+    name='camera_publisher',
+    output='screen',
     )
 
     # 프로파일별 실행 노드 목록

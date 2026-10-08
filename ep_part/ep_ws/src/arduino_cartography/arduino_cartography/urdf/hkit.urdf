@@ -1,0 +1,21 @@
+<?xml version="1.0"?>
+<robot name="hkit">
+  <link name="base_link">
+    <visual>
+      <!-- CAD +Y를 로봇 +X(전방)로 회전하고, 바닥 중심을 base_link에 맞춤 -->
+      <origin
+        xyz="0.05979 0 0.04704"
+        rpy="0 0 -1.5708"/>
+
+      <geometry>
+        <mesh
+          filename="package://arduino_cartography/meshes/hkit-Body.stl"
+          scale="0.001 0.001 0.001"/>
+      </geometry>
+
+      <material name="hkit_body">
+        <color rgba="0.65 0.68 0.72 1.0"/>
+      </material>
+    </visual>
+  </link>
+</robot>

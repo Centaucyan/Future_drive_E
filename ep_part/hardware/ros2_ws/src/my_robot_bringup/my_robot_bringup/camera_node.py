@@ -15,6 +15,7 @@ class CameraNode(Node):
     def __init__(self):
         super().__init__('camera_publisher')
 
+        # 카메라 해상도·프레임률, 발행할 토픽, 카메라 내부 파라미터를 설정한다.
         self.declare_parameter('frame_rate', 15.0)
         self.declare_parameter('frame_width', 640)
         self.declare_parameter('frame_height', 480)
@@ -50,6 +51,7 @@ class CameraNode(Node):
         self.published_sequence = 0
         self.fail_count = 0
 
+        # 설정된 메시지 종류만 publisher를 생성해 필요한 영상 데이터만 발행한다.
         if self.publish_compressed:
             self.compressed_pub = self.create_publisher(
                 CompressedImage,
@@ -70,6 +72,7 @@ class CameraNode(Node):
                 get_param('camera_info_topic').value,
                 2,
             )
+            # CameraInfo의 K/P 행렬과 왜곡 계수를 설정한다.
             self.camera_info = CameraInfo()
             self.camera_info.width = self.width
             self.camera_info.height = self.height
@@ -92,6 +95,7 @@ class CameraNode(Node):
             self.camera_info.distortion_model = 'plumb_bob'
             self.camera_info.d = [0.0] * 5
 
+        # rpicam-vid 스트림을 시작하고, ROS 타이머로 주기적인 발행 작업을 예약한다.
         self.start_camera()
 
         self.create_timer(
@@ -100,6 +104,7 @@ class CameraNode(Node):
         )
 
     def start_camera(self):
+        # 기존 프로세스가 남아 있으면 정리한 뒤 MJPEG를 표준 출력으로 내보낸다.
         self.stop_camera()
 
         command = [
@@ -127,6 +132,7 @@ class CameraNode(Node):
 
         self.get_logger().info('rpicam-vid 카메라 스트림 시작')
 
+        # 스트림 읽기는 별도 스레드에서 처리해 ROS 타이머가 막히지 않게 한다.
         reader = threading.Thread(
             target=self.read_mjpeg_stream,
             args=(self.process,),
@@ -135,6 +141,7 @@ class CameraNode(Node):
         reader.start()
 
     def stop_camera(self):
+        # 카메라 프로세스를 종료하고, 응답하지 않으면 강제 종료한 뒤 파이프를 닫는다.
         process = self.process
         self.process = None
 
@@ -151,6 +158,7 @@ class CameraNode(Node):
                 process.stdout.close()
 
     def read_mjpeg_stream(self, process):
+        # 표준 출력의 임의 크기 데이터 청크에서 JPEG 시작/끝 마커로 프레임을 추출한다.
         buffer = bytearray()
 
         try:
@@ -182,6 +190,7 @@ class CameraNode(Node):
                     frame = cv2.imdecode(encoded, cv2.IMREAD_COLOR)
 
                     if frame is not None:
+                        # 가장 최근 프레임만 보관하고, 타이머와 공유하는 데이터는 잠금으로 보호한다.
                         with self.frame_lock:
                             self.latest_frame = frame
                             self.frame_sequence += 1
@@ -190,6 +199,7 @@ class CameraNode(Node):
             self.get_logger().warning(f'MJPEG 스트림 읽기 종료: {exc}')
 
     def tick(self):
+        # 프로세스 종료 또는 프레임 미수신을 감지하면 일정 횟수마다 카메라를 재시작한다.
         if self.process is None or self.process.poll() is not None:
             self.fail_count += 1
             if self.fail_count % 15 == 0:
@@ -197,6 +207,7 @@ class CameraNode(Node):
                 self.start_camera()
             return
 
+        # 새 프레임이 있을 때만 복사해 발행하며, 읽기 스레드와의 동시 접근을 막는다.
         with self.frame_lock:
             if (
                 self.latest_frame is None
@@ -217,6 +228,7 @@ class CameraNode(Node):
 
         self.fail_count = 0
 
+        # 예상 해상도에 맞추고 카메라 장착 방향에 맞춰 영상을 180도 회전한다.
         if frame.shape[1] != self.width or frame.shape[0] != self.height:
             frame = cv2.resize(frame, (self.width, self.height))
         
@@ -224,6 +236,7 @@ class CameraNode(Node):
 
         stamp = self.get_clock().now().to_msg()
 
+        # 압축 이미지 토픽에는 JPEG 인코딩 결과와 공통 헤더를 담아 발행한다.
         if self.publish_compressed:
             ok, encoded = cv2.imencode(
                 '.jpg',
@@ -238,6 +251,7 @@ class CameraNode(Node):
                 msg.data = encoded.tobytes()
                 self.compressed_pub.publish(msg)
 
+        # 원본 이미지 토픽에는 BGR 픽셀 배열과 인코딩 정보를 담아 발행한다.
         if self.publish_raw:
             msg = Image()
             msg.header.stamp = stamp
@@ -250,17 +264,20 @@ class CameraNode(Node):
             msg.data = frame.tobytes()
             self.raw_pub.publish(msg)
 
+        # 이미지와 같은 시각·프레임 ID를 사용해 카메라 보정 정보를 발행한다.
         if self.publish_camera_info:
             self.camera_info.header.stamp = stamp
             self.camera_info.header.frame_id = self.frame_id
             self.info_pub.publish(self.camera_info)
 
     def destroy_node(self):
+        # ROS 노드 종료 전에 외부 카메라 프로세스를 정리한다.
         self.stop_camera()
         super().destroy_node()
 
 
 def main(args=None):
+    # ROS를 초기화하고 노드를 실행한 뒤, 인터럽트나 종료 시 자원을 정리한다.
     rclpy.init(args=args)
     node = CameraNode()
 

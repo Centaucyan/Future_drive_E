@@ -6,7 +6,7 @@
   <description>TODO: Package description</description>
   <maintainer email="hkit@todo.todo">hkit</maintainer>
   <license>TODO: License declaration</license>
-
+  <exec_depend>robot_state_publisher</exec_depend>
   <depend>geometry_msgs</depend>
   <depend>nav_msgs</depend>
   <depend>rclcpp</depend>

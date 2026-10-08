@@ -15,6 +15,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ros-humble-usb-cam \
     ros-humble-compressed-image-transport \
     ros-humble-rplidar-ros \
+    ros-humble-vision-msgs \
     python3-serial \
     python3-opencv \
     python3-numpy \
