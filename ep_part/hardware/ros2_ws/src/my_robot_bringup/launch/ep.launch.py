@@ -92,7 +92,14 @@ def generate_launch_description():
             'serial_port': '/dev/ttyACM0',
         }],
     )
-
+    
+    camera_node = Node(
+    package=package_name,
+    executable='camera_node',
+    name='camera_publisher',
+    output='screen',
+    )
+    
     rplidar_cmd_2 = Node(
         package='rplidar_ros',
         executable='rplidar_node',
@@ -133,6 +140,7 @@ def generate_launch_description():
     ld_hkit5.add_action(rplidar_cmd_2)
     ld_hkit5.add_action(laser_static_tf_node_2)
     ld_hkit5.add_action(cmd_bridge_node)
+    ld_hkit5.add_action(camera_node)
 
     if profile == "hkit4":
         return ld_hkit4
