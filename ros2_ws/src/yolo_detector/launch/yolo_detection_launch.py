@@ -100,7 +100,7 @@ def generate_launch_description():
             'model_name': LaunchConfiguration('model_name'),
             'four_wheeler_confidence': 0.75,
             'two_wheeler_confidence': 0.30,
-            'person_confidence': 0.30,
+            'person_confidence': 0.40,
             'confirmation_frames': 2,
             'max_missed_frames': 0,
             'temporal_iou_threshold': 0.15,

@@ -32,11 +32,21 @@ class CameraPublisher(Node):
             video_source = int(video_source)
 
         frame_rate = self.get_parameter('frame_rate').value
-        frame_width = self.get_parameter('frame_width').value
-        frame_height = self.get_parameter('frame_height').value
+
+        self.frame_width = int(
+            self.get_parameter('frame_width').value
+        )
+
+        self.frame_height = int(
+            self.get_parameter('frame_height').value
+        )
 
         # ── 퍼블리셔 생성 ──
-        self.publisher_ = self.create_publisher(Image, '/camera/image_raw', 10)
+        self.publisher_ = self.create_publisher(
+            Image,
+            '/camera/image_raw',
+            10,
+        )
 
         # ── OpenCV 비디오 캡처 설정 ──
         self.bridge = CvBridge()
@@ -44,18 +54,31 @@ class CameraPublisher(Node):
         # video_source가 숫자면 카메라, 문자열이면 영상 파일
         if isinstance(video_source, int):
             self.cap = cv2.VideoCapture(video_source)
-            self.get_logger().info(f'📷 카메라 장치 [{video_source}] 을 열었습니다.')
+            self.get_logger().info(
+                f'📷 카메라 장치 [{video_source}] 을 열었습니다.'
+            )
         else:
             self.cap = cv2.VideoCapture(video_source)
-            self.get_logger().info(f'🎬 영상 파일 [{video_source}] 을 열었습니다.')
+            self.get_logger().info(
+                f'🎬 영상 파일 [{video_source}] 을 열었습니다.'
+            )
 
         if not self.cap.isOpened():
-            self.get_logger().error('❌ 비디오 소스를 열 수 없습니다!')
+            self.get_logger().error(
+                '❌ 비디오 소스를 열 수 없습니다!'
+            )
             return
 
-        # 카메라 해상도 설정
-        self.cap.set(cv2.CAP_PROP_FRAME_WIDTH, frame_width)
-        self.cap.set(cv2.CAP_PROP_FRAME_HEIGHT, frame_height)
+        # 웹캠인 경우 요청 해상도 설정
+        self.cap.set(
+            cv2.CAP_PROP_FRAME_WIDTH,
+            self.frame_width,
+        )
+
+        self.cap.set(
+            cv2.CAP_PROP_FRAME_HEIGHT,
+            self.frame_height,
+        )
 
         actual_w = int(self.cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         actual_h = int(self.cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -89,6 +112,19 @@ class CameraPublisher(Node):
             else:
                 self.get_logger().warn('⚠️ 프레임을 읽을 수 없습니다.')
                 return
+
+        if (
+            frame.shape[1] != self.frame_width
+            or frame.shape[0] != self.frame_height
+        ):
+            frame = cv2.resize(
+                frame,
+                (
+                    self.frame_width,
+                    self.frame_height,
+                ),
+                interpolation=cv2.INTER_AREA,
+            )
 
         # OpenCV 이미지 → ROS2 Image 메시지 변환
         msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')

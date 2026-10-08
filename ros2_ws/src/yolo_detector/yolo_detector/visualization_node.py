@@ -60,7 +60,11 @@ class VisualizationNode(Node):
         try:
             cv_image=self.bridge.imgmsg_to_cv2(msg,desired_encoding='bgr8')
 
-            if self.lane_data is not None and self.lane_data[0] > 0.5:
+            if (
+                self.lane_data is not None
+                and len(self.lane_data) >= 85
+                and self.lane_data[0] > 0.5
+            ):
                 left_points=[]
                 right_points=[]
 
@@ -116,8 +120,17 @@ class VisualizationNode(Node):
             self.get_logger().error(f'❌ JSON 파싱 오류: {e}')
 
     def lane_callback(self, msg):
-        if msg.data[0] > 0.5:
-            self.lane_data=msg.data
+        data = list(msg.data)
+
+        expected_length = 5 + (20 * 4)
+
+        if (
+            len(data) >= expected_length
+            and data[0] > 0.5
+        ):
+            self.lane_data = data
+        else:
+            self.lane_data = None
 
     def destroy_node(self):
         cv2.destroyAllWindows()
