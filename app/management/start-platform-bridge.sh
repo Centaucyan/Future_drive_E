@@ -60,7 +60,7 @@ docker run -d \
   -e RTABMAP_DATABASE_PATH=/workspace/maps/rtabmap-active.db \
   -e WORLD_LAYOUT_PATH=/workspace/world-layout.json \
   -e ROBOT_STACK=nav2 \
-  -e "CAMERA_IMAGE_TOPIC=${CAMERA_IMAGE_TOPIC:-/image_raw/compressed}" \
+  -e "CAMERA_IMAGE_TOPIC=${CAMERA_IMAGE_TOPIC:-/yolo/result_image/compressed}" \
   -e RCUTILS_COLORIZED_OUTPUT=1 \
   -e RCUTILS_LOGGING_BUFFERED_STREAM=0 \
   -e PYTHONUNBUFFERED=1 \

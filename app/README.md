@@ -120,7 +120,7 @@ http://<브리지-PC-IP>:8765
 | 경로 | `/plan` |
 | 속도·위치 | `/odom` |
 | TF | `/tf`, `/tf_static` |
-| 카메라 | `/image_raw/compressed` |
+| 카메라 | `/yolo/result_image/compressed` |
 | 기체 모델 | `/robot_description` |
 | 위치 추정 | `/amcl_pose` |
 | 초기 위치 | `/initialpose` |
