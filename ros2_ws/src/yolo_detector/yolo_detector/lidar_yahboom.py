@@ -117,6 +117,7 @@ class YoloDetector(Node):
         self.detection_pub=self.create_publisher(Detection2DArray,'/yolo/detections',10)
         self.json_pub=self.create_publisher(String,'/yolo/detections_json',10)
         self.result_image_pub=self.create_publisher(Image,'/yolo/result_image',10)
+        self.result_compressed_image_pub = self.create_publisher(CompressedImage, "/yolo/result_image/compressed", 10)
         self.collision_warning_pub=self.create_publisher(String,'/collision_warning',10)
 
         self.inference_count=0
@@ -126,7 +127,7 @@ class YoloDetector(Node):
         self.lidar_monocular_threshold = 2.0
 
         self.get_logger().info(f'📥 구독 토픽: {input_topic}')
-        self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image, /collision_warning')
+        self.get_logger().info('📤 발행 토픽: /yolo/detections, /yolo/detections_json, /yolo/result_image, /yolo/result_image/compressed, /collision_warning')
         self.get_logger().info('🚀 YoloDetector 노드 시작!')
 
     def scan_callback(self,msg):
@@ -413,10 +414,21 @@ class YoloDetector(Node):
         },ensure_ascii=False)
         self.json_pub.publish(json_msg)
 
-        result_msg=self.bridge.cv2_to_imgmsg(
-            annotated_image,encoding='bgr8')
-        result_msg.header=msg.header
+        result_msg = self.bridge.cv2_to_imgmsg(annotated_image, encoding="bgr8")
+        result_msg.header = msg.header
         self.result_image_pub.publish(result_msg)
+
+        # 압축 이미지 발행
+        encoded_ok, encoded = cv2.imencode(".jpg", annotated_image)
+        if encoded_ok:
+            compressed_msg = CompressedImage()
+            compressed_msg.header = msg.header
+            compressed_msg.format = "jpeg"
+            compressed_msg.data = encoded.tobytes()
+            self.result_compressed_image_pub.publish(compressed_msg)
+        else:
+            self.get_logger().error("❌ YOLO 결과 이미지 JPEG 압축 실패")
+
 
         if self.inference_count%30==0:
             avg_time=self.total_inference_time/self.inference_count
