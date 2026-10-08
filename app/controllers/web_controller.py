@@ -35,14 +35,24 @@ def _post_platform(path: str, payload: dict) -> dict:
     )
     try:
         with urlopen(request, timeout=5) as response:
-            return json.loads(response.read().decode("utf-8"))
+            # HTTP 200이어도 HTML이나 손상된 JSON이 올 수 있으므로 502로 명확히 구분한다.
+            try:
+                result = json.loads(response.read().decode("utf-8"))
+            except (json.JSONDecodeError, UnicodeDecodeError) as error:
+                raise HTTPException(
+                    502, "플랫폼 제어 API 응답을 해석할 수 없습니다."
+                ) from error
+            if not isinstance(result, dict):
+                raise HTTPException(502, "플랫폼 제어 API 응답 형식이 올바르지 않습니다.")
+            return result
     except HTTPError as error:
+        # 플랫폼 오류 본문까지 손상된 경우에도 원래 HTTP 상태 코드는 유지한다.
         try:
             detail = json.loads(error.read().decode("utf-8")).get("detail")
-        except (json.JSONDecodeError, UnicodeDecodeError):
+        except (AttributeError, json.JSONDecodeError, OSError, UnicodeDecodeError):
             detail = None
         raise HTTPException(error.code, detail or "플랫폼 제어 API가 요청을 거부했습니다.") from error
-    except (URLError, TimeoutError, OSError) as error:
+    except (URLError, TimeoutError, OSError, ValueError) as error:
         raise HTTPException(503, "플랫폼 제어 API에 연결할 수 없습니다.") from error
 
 
@@ -73,7 +83,13 @@ def create_router(view_path: Path) -> APIRouter:
 
     @router.delete("/api/bridges/{robot_id}")
     async def disconnect_bridge(robot_id: str) -> dict[str, bool]:
-        return {"stopped": await bridge_manager.disconnect(robot_id)}
+        # 잘못된 입력은 422, 실제 프로세스 종료 실패는 재시도 가능한 503으로 반환한다.
+        try:
+            return {"stopped": await bridge_manager.disconnect(robot_id)}
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
+        except (OSError, RuntimeError) as error:
+            raise HTTPException(503, str(error)) from error
 
     @router.post("/api/control/initialpose")
     async def initial_pose(payload: InitialPosePayload) -> dict:
