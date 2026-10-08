@@ -87,7 +87,9 @@ RUN cd /tmp/camera-build \
     && rpicam-hello --version \
     && rm -rf /tmp/camera-build
 
-RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc
+# ROS 2 언더레이 및 오버레이 워크스페이스 자동 소싱
+RUN echo "source /opt/ros/humble/setup.bash" >> /root/.bashrc && \
+    echo "source /root/ep_part/ros2_ws/install/setup.bash" >> /root/.bashrc
 
 WORKDIR /root
 CMD ["/bin/bash"]
