@@ -120,7 +120,7 @@ http://<브리지-PC-IP>:8765
 | 경로 | `/plan` |
 | 속도·위치 | `/odom` |
 | TF | `/tf`, `/tf_static` |
-| 카메라 | `/yolo/result_image/compressed` |
+| 카메라 원본 | `/image_raw/compressed` |
 | 기체 모델 | `/robot_description` |
 | 위치 추정 | `/amcl_pose` |
 | 초기 위치 | `/initialpose` |
@@ -128,6 +128,10 @@ http://<브리지-PC-IP>:8765
 | Nav2 주행 상태 복구 | `/navigate_to_pose/_action/status` |
 | 정지 속도 | `/cmd_vel` |
 | 배터리 | `/battery` |
+
+카메라는 각 로봇 브리지의 `/camera-frame` JPEG를 웹 서버가 받아 YOLO 처리한 뒤
+`/api/yolo-frame`으로 브라우저에 제공합니다. 웹 서버는 로봇 ROS Domain에 직접
+참여하지 않으며, Robot 1·2는 연결 설정에 저장된 서로 다른 브리지 주소로 구분합니다.
 
 초기 위치는 플랫폼 브리지의 `/initialpose`, 목적지는 `/navigate_to_pose`, 정지는 `/cancel_navigation`과 `/stop` API로 전송합니다.
 
