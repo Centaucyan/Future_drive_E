@@ -1,0 +1,23 @@
+running egg_info
+writing ../../build/arduino_cartography/arduino_cartography.egg-info/PKG-INFO
+writing dependency_links to ../../build/arduino_cartography/arduino_cartography.egg-info/dependency_links.txt
+writing requirements to ../../build/arduino_cartography/arduino_cartography.egg-info/requires.txt
+writing top-level names to ../../build/arduino_cartography/arduino_cartography.egg-info/top_level.txt
+reading manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+writing manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+running build
+running build_py
+copying arduino_cartography/__init__.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build/lib/arduino_cartography
+running install
+running install_lib
+running install_data
+copying resource/arduino_cartography -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/ament_index/resource_index/packages
+copying package.xml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography
+copying launch/futuredrive_hkit5.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+copying launch/futuredrive_hkit4.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+copying params/futuredrive_hkit.lua -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+running install_egg_info
+removing '/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography-0.0.0-py3.10.egg-info' (and everything under it)
+Copying ../../build/arduino_cartography/arduino_cartography.egg-info to /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography-0.0.0-py3.10.egg-info
+running install_scripts
+writing list of installed files to '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log'

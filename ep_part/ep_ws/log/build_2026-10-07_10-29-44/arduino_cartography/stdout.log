@@ -1,0 +1,32 @@
+running egg_info
+creating ../../build/arduino_cartography/arduino_cartography.egg-info
+writing ../../build/arduino_cartography/arduino_cartography.egg-info/PKG-INFO
+writing dependency_links to ../../build/arduino_cartography/arduino_cartography.egg-info/dependency_links.txt
+writing requirements to ../../build/arduino_cartography/arduino_cartography.egg-info/requires.txt
+writing top-level names to ../../build/arduino_cartography/arduino_cartography.egg-info/top_level.txt
+writing manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+reading manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+writing manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+running build
+running build_py
+creating /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build/lib/arduino_cartography
+copying arduino_cartography/__init__.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build/lib/arduino_cartography
+running install
+running install_lib
+creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography
+copying /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build/lib/arduino_cartography/__init__.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography
+byte-compiling /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography/__init__.py to __init__.cpython-310.pyc
+running install_data
+creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/ament_index/resource_index/packages
+copying resource/arduino_cartography -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/ament_index/resource_index/packages
+copying package.xml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography
+creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+copying launch/futuredrive_hkit5.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+copying launch/futuredrive_hkit4.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+copying params/futuredrive_hkit5.lua -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+copying params/futuredrive_hkit4.lua -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+running install_egg_info
+Copying ../../build/arduino_cartography/arduino_cartography.egg-info to /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography-0.0.0-py3.10.egg-info
+running install_scripts
+writing list of installed files to '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log'

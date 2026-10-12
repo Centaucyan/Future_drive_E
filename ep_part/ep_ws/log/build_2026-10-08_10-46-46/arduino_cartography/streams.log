@@ -1,0 +1,26 @@
+[0.739s] Invoking command in '/home/hkit/Future_drive_E/ep_part/ep_ws/src/arduino_cartography': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/arduino_cartography build --build-base /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build install --record /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log --install-scripts $base/lib/arduino_cartography --single-version-externally-managed install_data
+[1.006s] running egg_info
+[1.024s] writing ../../build/arduino_cartography/arduino_cartography.egg-info/PKG-INFO
+[1.025s] writing dependency_links to ../../build/arduino_cartography/arduino_cartography.egg-info/dependency_links.txt
+[1.025s] writing requirements to ../../build/arduino_cartography/arduino_cartography.egg-info/requires.txt
+[1.026s] writing top-level names to ../../build/arduino_cartography/arduino_cartography.egg-info/top_level.txt
+[1.066s] reading manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+[1.067s] writing manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+[1.067s] running build
+[1.067s] running build_py
+[1.067s] copying arduino_cartography/__init__.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build/lib/arduino_cartography
+[1.068s] running install
+[1.072s] running install_lib
+[1.091s] running install_data
+[1.091s] copying resource/arduino_cartography -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/ament_index/resource_index/packages
+[1.091s] copying package.xml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography
+[1.092s] copying launch/futuredrive_hkit.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+[1.092s] copying launch/nav2_hkit5.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+[1.092s] copying params/nav2_params.yaml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+[1.093s] copying params/futuredrive_hkit.lua -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+[1.093s] running install_egg_info
+[1.112s] removing '/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography-0.0.0-py3.10.egg-info' (and everything under it)
+[1.113s] Copying ../../build/arduino_cartography/arduino_cartography.egg-info to /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography-0.0.0-py3.10.egg-info
+[1.114s] running install_scripts
+[1.251s] writing list of installed files to '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log'
+[1.273s] Invoked command in '/home/hkit/Future_drive_E/ep_part/ep_ws/src/arduino_cartography' returned '0': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/arduino_cartography build --build-base /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build install --record /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log --install-scripts $base/lib/arduino_cartography --single-version-externally-managed install_data
