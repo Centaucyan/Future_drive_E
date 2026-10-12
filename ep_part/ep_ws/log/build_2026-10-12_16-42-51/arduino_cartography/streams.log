@@ -1,0 +1,24 @@
+[1.162s] Invoking command in '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build --no-deps symlink_data --force
+[1.504s] running develop
+[1.742s] running egg_info
+[1.762s] writing arduino_cartography.egg-info/PKG-INFO
+[1.763s] writing dependency_links to arduino_cartography.egg-info/dependency_links.txt
+[1.763s] writing requirements to arduino_cartography.egg-info/requires.txt
+[1.763s] writing top-level names to arduino_cartography.egg-info/top_level.txt
+[1.809s] reading manifest file 'arduino_cartography.egg-info/SOURCES.txt'
+[1.812s] writing manifest file 'arduino_cartography.egg-info/SOURCES.txt'
+[1.836s] running build_ext
+[1.836s] Creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino-cartography.egg-link (link to .)
+[1.836s] 
+[1.836s] Installed /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography
+[1.837s] running symlink_data
+[1.837s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/resource/arduino_cartography -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/ament_index/resource_index/packages
+[1.837s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/package.xml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography
+[1.837s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/launch/futuredrive_hkit.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+[1.838s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/launch/nav2_hkit5.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+[1.838s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/params/nav2_params.yaml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+[1.838s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/params/futuredrive_hkit.lua -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+[1.839s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/arduino_cartography/meshes/hkit-Body.stl -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/meshes
+[1.839s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/arduino_cartography/urdf/hkit.urdf -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/urdf
+[1.840s] symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/rviz/nav2_view.rviz -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/rviz
+[1.868s] Invoked command in '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography' returned '0': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --editable --build-directory /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build --no-deps symlink_data --force

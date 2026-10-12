@@ -1,0 +1,13 @@
+running develop
+running egg_info
+writing arduino_cartography.egg-info/PKG-INFO
+writing dependency_links to arduino_cartography.egg-info/dependency_links.txt
+writing requirements to arduino_cartography.egg-info/requires.txt
+writing top-level names to arduino_cartography.egg-info/top_level.txt
+reading manifest file 'arduino_cartography.egg-info/SOURCES.txt'
+writing manifest file 'arduino_cartography.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino-cartography.egg-link (link to .)
+
+Installed /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography
+running symlink_data

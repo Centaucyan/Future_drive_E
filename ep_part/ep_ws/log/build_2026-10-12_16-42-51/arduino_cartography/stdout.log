@@ -1,0 +1,22 @@
+running develop
+running egg_info
+writing arduino_cartography.egg-info/PKG-INFO
+writing dependency_links to arduino_cartography.egg-info/dependency_links.txt
+writing requirements to arduino_cartography.egg-info/requires.txt
+writing top-level names to arduino_cartography.egg-info/top_level.txt
+reading manifest file 'arduino_cartography.egg-info/SOURCES.txt'
+writing manifest file 'arduino_cartography.egg-info/SOURCES.txt'
+running build_ext
+Creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino-cartography.egg-link (link to .)
+
+Installed /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography
+running symlink_data
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/resource/arduino_cartography -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/ament_index/resource_index/packages
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/package.xml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/launch/futuredrive_hkit.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/launch/nav2_hkit5.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/params/nav2_params.yaml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/params/futuredrive_hkit.lua -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/arduino_cartography/meshes/hkit-Body.stl -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/meshes
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/arduino_cartography/urdf/hkit.urdf -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/urdf
+symbolically linking /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/rviz/nav2_view.rviz -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/rviz

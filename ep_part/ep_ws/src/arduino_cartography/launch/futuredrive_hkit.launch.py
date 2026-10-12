@@ -13,18 +13,20 @@ def generate_launch_description():
     package_name = 'arduino_cartography'
 
     package_share = get_package_share_directory(package_name)
-    cartographer_share = get_package_share_directory('cartographer_ros')
-
     use_sim_time = LaunchConfiguration('use_sim_time')
+
+    rviz_config = os.path.join(
+        package_share,
+        'rviz',
+        'nav2_view.rviz',
+    )
 
     cartographer_node = Node(
         package='cartographer_ros',
         executable='cartographer_node',
         name='cartographer_node',
         output='screen',
-        parameters=[{
-            'use_sim_time': use_sim_time,
-        }],
+        parameters=[{'use_sim_time': use_sim_time}],
         arguments=[
             '-configuration_directory',
             os.path.join(package_share, 'params'),
@@ -42,9 +44,7 @@ def generate_launch_description():
         executable='cartographer_occupancy_grid_node',
         name='cartographer_occupancy_grid_node',
         output='screen',
-        parameters=[{
-            'use_sim_time': use_sim_time,
-        }],
+        parameters=[{'use_sim_time': use_sim_time}],
         arguments=[
             '-resolution', '0.05',
             '-publish_period_sec', '1.0',
@@ -56,11 +56,9 @@ def generate_launch_description():
         executable='rviz2',
         name='rviz2',
         output='screen',
-        parameters=[{
-            'use_sim_time': use_sim_time,
-        }],
+        arguments=['-d', rviz_config],
+        parameters=[{'use_sim_time': use_sim_time}],
     )
-
 
     return LaunchDescription([
         DeclareLaunchArgument(

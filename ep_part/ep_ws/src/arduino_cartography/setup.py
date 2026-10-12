@@ -16,6 +16,7 @@ setup(
         (os.path.join('share', package_name, 'params'), glob('params/*')),
         (os.path.join('share', package_name, 'meshes'), glob('arduino_cartography/meshes/*')),
         (os.path.join('share', package_name, 'urdf'), glob('arduino_cartography/urdf/*')),
+        (os.path.join('share', package_name, 'rviz'), glob('rviz/*.rviz')),
     ],
     install_requires=['setuptools'],
     zip_safe=True,
