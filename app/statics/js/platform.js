@@ -81,7 +81,11 @@ export class PlatformConnection {
     }
     if (snapshot.camera_image?.t && snapshot.camera_image.t !== this.cameraStamp) {
       this.cameraStamp = snapshot.camera_image.t;
-      this.receive('platformCamera', {url: `${this.baseUrl}/camera-frame?t=${encodeURIComponent(this.cameraStamp)}`});
+      const query = new URLSearchParams({
+        bridge: this.baseUrl,
+        t: String(this.cameraStamp)
+      });
+      this.receive('platformCamera', {url: `/api/yolo-frame?${query}`});
     }
     this.handlers.snapshot?.(snapshot);
   }

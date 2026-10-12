@@ -12,7 +12,7 @@ import {
 import {
   OrbitControls
 } from '../vendor/OrbitControls.js';
-import { PlatformConnection } from './platform.js';
+import { PlatformConnection } from './platform.js?v=web-yolo-1';
 
 // 기본 도우미와 로봇별 연결 설정을 준비한다.
 const $ = id => document.getElementById(id);
@@ -62,7 +62,7 @@ const defaults = {
   odom: '/odom',
   tf: '/tf',
   static: '/tf_static',
-  camera: '/yolo/result_image/compressed',
+  camera: '/image_raw/compressed',
   description: '/robot_description',
   amcl: '/amcl_pose',
   action: '/navigate_to_pose',
@@ -1021,7 +1021,7 @@ function updateDashboard() {
     {key: 'plan', fallback: '/plan', mode: 'endpoint'},
     {key: 'amcl_pose', fallback: '/amcl_pose', mode: 'live', receivedKey: 'amcl'},
     {key: 'tf', fallback: '/tf', mode: 'live'},
-    {key: 'camera_image', fallback: '/yolo/result_image/compressed', mode: 'live', receivedKey: 'camera'},
+    {key: 'camera_image', fallback: '/image_raw/compressed', mode: 'live', receivedKey: 'camera'},
     {key: 'cmd_vel', fallback: '/cmd_vel', mode: 'endpoint'},
     {key: 'navigate_to_pose', fallback: '/navigate_to_pose', mode: 'endpoint'}
   ];

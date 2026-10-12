@@ -36,3 +36,8 @@ bash app/management/start-platform-bridge.sh
 ```
 
 기존 `start-bridge.sh`는 이전 rosbridge 방식이 필요할 때만 사용합니다.
+
+웹 카메라는 각 연결 설정의 플랫폼 브리지 `/camera-frame`을 웹 서버의
+`/api/yolo-frame`이 가져와 YOLO 처리합니다. 따라서 웹 서버에서 Robot별 ROS Domain
+프로세스를 따로 실행할 필요가 없습니다. `YOLO_MODEL_PATH`, `YOLO_DEVICE`,
+`YOLO_CONFIDENCE` 환경변수로 모델 경로, 추론 장치, 신뢰도 기준을 변경할 수 있습니다.

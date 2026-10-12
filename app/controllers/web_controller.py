@@ -6,11 +6,16 @@ from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
 from fastapi import APIRouter, HTTPException
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel
 
 from app.models.bridge_manager import bridge_manager
 from app.models.viewer_model import viewer_settings
+from app.models.yolo_frame_processor import (
+    FrameSourceError,
+    YoloProcessingError,
+    yolo_frame_processor,
+)
 
 
 class InitialPosePayload(BaseModel):
@@ -71,6 +76,25 @@ def create_router(view_path: Path) -> APIRouter:
     @router.get("/api/health")
     async def health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @router.get("/api/yolo-frame")
+    async def yolo_frame(bridge: str, t: str = "") -> Response:
+        try:
+            # PyTorch/OpenCV 추론은 웹 서버 프로세스의 주 실행 스레드에서 실행한다.
+            # 로봇 상태와 제어 WebSocket은 브라우저가 각 브리지에 직접 연결하므로
+            # 프레임 추론 중에도 로봇 제어 경로는 영향을 받지 않는다.
+            frame = yolo_frame_processor.process(bridge, t)
+        except ValueError as error:
+            raise HTTPException(422, str(error)) from error
+        except FrameSourceError as error:
+            raise HTTPException(502, str(error)) from error
+        except YoloProcessingError as error:
+            raise HTTPException(503, str(error)) from error
+        return Response(
+            content=frame,
+            media_type="image/jpeg",
+            headers={"Cache-Control": "no-store"},
+        )
 
     @router.post("/api/bridges/connect")
     async def connect_bridge(payload: BridgeConnectPayload) -> dict:
