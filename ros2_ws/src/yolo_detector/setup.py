@@ -32,12 +32,10 @@ setup(
     },
     entry_points={
         'console_scripts': [
-            'camera_node = yolo_detector.camera_node:main',
+            'camera_node = yolo_detector.test_camera_node:main',
             'lane_node = yolo_detector.lane_node:main',
-            'yolo_node = yolo_detector.yolo_node:main',
             'visualization_node = yolo_detector.visualization_node:main',
             'result_video_recorder = yolo_detector.result_video_recorder:main',
-            'yahboom_yolo = yolo_detector.yahboom_yolo:main',
             'lidar_yahboom = yolo_detector.lidar_yahboom:main',
             'collision_stop_node = yolo_detector.collision_stop_node:main',
         ],
