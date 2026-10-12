@@ -7,7 +7,7 @@
 
 import rclpy
 from rclpy.node import Node
-from sensor_msgs.msg import Image
+from sensor_msgs.msg import Image, CompressedImage
 from cv_bridge import CvBridge
 import cv2
 
@@ -45,6 +45,11 @@ class CameraPublisher(Node):
         self.publisher_ = self.create_publisher(
             Image,
             '/camera/image_raw',
+            10,
+        )
+        self.compressed_publisher_ = self.create_publisher(
+            CompressedImage,
+            '/image_raw/compressed',
             10,
         )
 
@@ -126,12 +131,24 @@ class CameraPublisher(Node):
                 interpolation=cv2.INTER_AREA,
             )
 
+        stamp = self.get_clock().now().to_msg()
+
         # OpenCV 이미지 → ROS2 Image 메시지 변환
         msg = self.bridge.cv2_to_imgmsg(frame, encoding='bgr8')
-        msg.header.stamp = self.get_clock().now().to_msg()
+        msg.header.stamp = stamp
         msg.header.frame_id = 'camera_frame'
-
         self.publisher_.publish(msg)
+
+        # 압축 이미지 (CompressedImage) 발행 -> lidar_yahboom 및 lane_node와 호환
+        ret_enc, encoded = cv2.imencode('.jpg', frame)
+        if ret_enc:
+            compressed_msg = CompressedImage()
+            compressed_msg.header.stamp = stamp
+            compressed_msg.header.frame_id = 'camera_frame'
+            compressed_msg.format = 'jpeg'
+            compressed_msg.data = encoded.tobytes()
+            self.compressed_publisher_.publish(compressed_msg)
+
         self.frame_count += 1
 
         if self.frame_count % 100 == 0:
