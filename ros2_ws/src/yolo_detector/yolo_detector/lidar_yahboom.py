@@ -454,7 +454,7 @@ class YoloDetector(Node):
                 danger = (
                     is_front
                     and warning_distance is not None
-                    and warning_distance < 0.5
+                    and warning_distance < 0.2
                 )
                 
                 # 상대속도 계산

@@ -6,7 +6,23 @@ opencv-python==4.10.0.84 \
 torch==2.14.0 \
 torchvision==0.29.0
 
+# yolo_dector 패키지 실행
+## 런치파일 실행 (YOLO모델+차선인식+충돌감지)
+colcon build
+source install/setup.bash
+ros2 launch yolo_detector yolo_yahboom.launch.py
 
+
+## 개별노드
+###YOLO모델
+ros2 run yolo_detector lidar_yahboom
+###차선인식
+ros2 run yolo_detector lane_node
+###충돌감지
+ros2 run yolo_detector collision_stop_node
+
+
+#test
 # 개별 노드 실행
 ## 비디오 실행(샘플비디오를 ros2_ws폴더에 넣습니다)
 -터미널1(카메라노드)
@@ -16,28 +32,14 @@ ros2 run yolo_detector camera_node --ros-args -p video_source:=비디오이름.m
 
 -터미널2(yolo모델 처리)
 source install/setup.bash
-ros2 run yolo_detector yolo_node
+ros2 run yolo_detector lidar_yahboom
 
 -터미널3(시각화)
 source install/setup.bash
 ros2 run yolo_detector visualization_node
 
 
-## 웹캠 실행
-- 터미널1(카메라노드)
-colcon build
-source install/setup.bash
-ros2 run yolo_detector camera_node
-
--터미널2(yolo모델 처리)
-source install/setup.bash
-ros2 run yolo_detector yolo_node
-
--터미널3(시각화)
-source install/setup.bash
-ros2 run yolo_detector visualization_node
-
-
+<<<<<<< Updated upstream
 #통합런치
 ## 캠
 ros2 launch yolo_detector yolo_detection_launch
@@ -65,3 +67,5 @@ ros2 topic hz /yolo/detections
 ## 야붐 + 라이다 + 단안 거리 추정
 ros2 run yolo_detector lidar_yahboom --ros-args --params-file \
  src/yolo_detector/config/yaboom_camera_info.yaml
+=======
+>>>>>>> Stashed changes

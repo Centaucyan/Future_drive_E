@@ -13,6 +13,11 @@ def generate_launch_description():
             prefix=[
                 'gnome-terminal --title="[Node 1] Yolo detector" -- '
             ],
+            arguments=[
+                '--ros-args',
+                '--params-file',
+                'src/yolo_detector/config/yaboom_camera_info.yaml'
+            ],
         ),
 
         # 2. 충돌 정지 노드
@@ -23,6 +28,16 @@ def generate_launch_description():
             output='screen',
             prefix=[
                 'gnome-terminal --title="[Node 2] Collision stop node" -- '
+            ],
+        ),
+
+        Node(
+            package='yolo_detector',
+            executable='lane_node',
+            name='lane_node',
+            output='screen',
+            prefix=[
+                'gnome-terminal --title="[Node 3] lane_node" -- '
             ],
         ),
     ])
