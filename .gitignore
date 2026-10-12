@@ -9,11 +9,14 @@ __pycache__/
 /temp/
 
 #. ROS2 build Output
-build/
-install/
-log/
-*.mp4
+ros2_ws/build/
+ros2_ws/install/
+ros2_ws/log/
+
+# Test VIdeo
+ros2_ws/*.mp4
+ros2_ws/*.webm
+
 .venv/
 app/runtime/
-*.webm
 runtime/
