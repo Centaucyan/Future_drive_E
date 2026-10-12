@@ -128,10 +128,20 @@ Future_drive_E/
 
 ## 3. 사전 설치 (Pre-installed)
 
-### 공통 ROS 2 환경 설정
+### ROS 2 환경 설정
 ```bash
 source /opt/ros/humble/setup.bash
-export ROS_DOMAIN_ID=42
+
+# 1호차
+export ROS_DOMAIN_ID=10
+# 2호차
+export ROS_DOMAIN_ID=20
+# 3호차
+export ROS_DOMAIN_ID=30
+# 4호차
+export ROS_DOMAIN_ID=40
+# 5호차
+export ROS_DOMAIN_ID=50
 ```
 
 ### AP Part (웹 관제 서버)
