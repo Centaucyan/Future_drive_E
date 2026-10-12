@@ -1,7 +1,7 @@
-# Future_drive Project (모빌리티 E)
+# Future_drive Project (융합 AI 미래형모빌리티 E)
 
-ROS 2 Humble 기반의 **자율주행 모빌리티 통합 시스템** 프로젝트입니다.  
-임베디드 하드웨어 제어 및 2D SLAM/자율주행(**EP**), AI 기반 실시간 객체·차선 인지 및 센서 퓨전 충돌 방지(**SP**), 그리고 멀티 로봇 3D 웹 관제 및 원격 제어 플랫폼(**AP**)의 3개 파트로 구성되어 있습니다.
+* ROS 2 Humble 기반의 **자율주행 모빌리티 통합 시스템을 구축**하고, 퓨처드라이브의 **Autonomy Studio** 플랫폼과 연동하여 효율적인 자율주행 개발 및 실습 환경을 구현한 프로젝트
+* 임베디드 하드웨어 제어 및 2D SLAM/자율주행(EP), AI 기반 실시간 객체·차선 인지 및 센서 퓨전 충돌 방지(SP), 그리고 멀티 로봇 3D 웹 관제 및 원격 제어 플랫폼(AP)의 3개 파트로 나누어 프로젝트 진행
 
 ---
 
@@ -132,15 +132,15 @@ Future_drive_E/
 ```bash
 source /opt/ros/humble/setup.bash
 
-# 1호차
+# 1호차_(192.168.0.31)
 export ROS_DOMAIN_ID=10
-# 2호차
+# 2호차_(192.168.0.32)
 export ROS_DOMAIN_ID=20
-# 3호차
+# 3호차_(192.168.0.33)
 export ROS_DOMAIN_ID=30
-# 4호차
+# 4호차_(192.168.0.34)
 export ROS_DOMAIN_ID=40
-# 5호차
+# 5호차_(192.168.0.35)
 export ROS_DOMAIN_ID=50
 ```
 
