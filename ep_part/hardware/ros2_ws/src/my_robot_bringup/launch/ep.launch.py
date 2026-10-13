@@ -114,7 +114,7 @@ def generate_launch_description():
             '--x', '0.03',
             '--y', '0.09',
             '--z', '0.11',
-            '--yaw', '0',
+            '--yaw', '-0.1745',
             '--pitch', '0',
             '--roll', '0',
             '--frame-id', 'base_link',
