@@ -303,7 +303,7 @@ root@hkit5:~#
 cd /root/ep_part/ros2_ws
 source /opt/ros/humble/setup.bash
 
-colcon build --symlink-install
+colcon build
 source install/setup.bash
 ```
 
@@ -577,7 +577,7 @@ SL_RESULT_OPERATION_TIMEOUT
 cd ~/Future_drive_E/ep_part/ep_ws
 source /opt/ros/humble/setup.bash
 
-colcon build --symlink-install
+colcon build
 source install/setup.bash
 ```
 
