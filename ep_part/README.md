@@ -312,6 +312,17 @@ source install/setup.bash
 ```bash
 ros2 launch my_robot_bringup ep.launch.py
 ```
+ usbcam으로 연결한 경우 카메라 노드는 별도로 실행
+ 
+ '''bash
+  ros2 run usb_cam usb_cam_node_exe --ros-args \
+    -p video_device:=/dev/video0 \
+    -p image_width:=640 \
+    -p image_height:=480 \
+    -p framerate:=30.0 \
+    -p pixel_format:=yuyv
+ '''
+
 
 프로파일별 실행 노드:
 

@@ -1,0 +1,35 @@
+[3.797s] Invoking command in '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --uninstall --editable --build-directory /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build
+[4.644s] running develop
+[4.978s] Removing /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino-cartography.egg-link (link to .)
+[5.015s] Invoked command in '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography' returned '0': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py develop --uninstall --editable --build-directory /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build
+[5.018s] Invoking command in '/home/hkit/Future_drive_E/ep_part/ep_ws/src/arduino_cartography': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/arduino_cartography build --build-base /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build install --record /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log --install-scripts $base/lib/arduino_cartography --single-version-externally-managed install_data --force
+[5.527s] running egg_info
+[5.548s] writing ../../build/arduino_cartography/arduino_cartography.egg-info/PKG-INFO
+[5.549s] writing dependency_links to ../../build/arduino_cartography/arduino_cartography.egg-info/dependency_links.txt
+[5.549s] writing requirements to ../../build/arduino_cartography/arduino_cartography.egg-info/requires.txt
+[5.550s] writing top-level names to ../../build/arduino_cartography/arduino_cartography.egg-info/top_level.txt
+[5.599s] reading manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+[5.601s] writing manifest file '../../build/arduino_cartography/arduino_cartography.egg-info/SOURCES.txt'
+[5.602s] running build
+[5.602s] running build_py
+[5.604s] copying arduino_cartography/__init__.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build/lib/arduino_cartography
+[5.604s] running install
+[5.608s] running install_lib
+[5.631s] creating /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography
+[5.631s] copying /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build/lib/arduino_cartography/__init__.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography
+[5.633s] byte-compiling /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography/__init__.py to __init__.cpython-310.pyc
+[5.633s] running install_data
+[5.634s] copying resource/arduino_cartography -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/ament_index/resource_index/packages
+[5.635s] copying package.xml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography
+[5.636s] copying launch/futuredrive_hkit.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+[5.637s] copying launch/nav2_hkit5.launch.py -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/launch
+[5.638s] copying params/nav2_params.yaml -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+[5.640s] copying params/futuredrive_hkit.lua -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/params
+[5.640s] copying arduino_cartography/meshes/hkit-Body.stl -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/meshes
+[5.655s] copying arduino_cartography/urdf/hkit.urdf -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/urdf
+[5.656s] copying rviz/nav2_view.rviz -> /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/share/arduino_cartography/rviz
+[5.658s] running install_egg_info
+[5.687s] Copying ../../build/arduino_cartography/arduino_cartography.egg-info to /home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages/arduino_cartography-0.0.0-py3.10.egg-info
+[5.688s] running install_scripts
+[5.903s] writing list of installed files to '/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log'
+[5.928s] Invoked command in '/home/hkit/Future_drive_E/ep_part/ep_ws/src/arduino_cartography' returned '0': PYTHONPATH=/home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/prefix_override:/usr/lib/python3/dist-packages/colcon_core/task/python/colcon_distutils_commands:/home/hkit/Future_drive_E/ep_part/ep_ws/install/arduino_cartography/lib/python3.10/site-packages:${PYTHONPATH} /usr/bin/python3 -W ignore:setup.py install is deprecated -W ignore:easy_install command is deprecated setup.py egg_info --egg-base ../../build/arduino_cartography build --build-base /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/build install --record /home/hkit/Future_drive_E/ep_part/ep_ws/build/arduino_cartography/install.log --install-scripts $base/lib/arduino_cartography --single-version-externally-managed install_data --force

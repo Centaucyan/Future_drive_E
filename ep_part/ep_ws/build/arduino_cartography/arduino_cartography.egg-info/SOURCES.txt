@@ -8,12 +8,6 @@ setup.py
 ../../build/arduino_cartography/arduino_cartography.egg-info/top_level.txt
 ../../build/arduino_cartography/arduino_cartography.egg-info/zip-safe
 arduino_cartography/__init__.py
-arduino_cartography.egg-info/PKG-INFO
-arduino_cartography.egg-info/SOURCES.txt
-arduino_cartography.egg-info/dependency_links.txt
-arduino_cartography.egg-info/requires.txt
-arduino_cartography.egg-info/top_level.txt
-arduino_cartography.egg-info/zip-safe
 arduino_cartography/meshes/hkit-Body.stl
 arduino_cartography/urdf/hkit.urdf
 launch/futuredrive_hkit.launch.py
@@ -22,3 +16,6 @@ params/futuredrive_hkit.lua
 params/nav2_params.yaml
 resource/arduino_cartography
 rviz/nav2_view.rviz
+test/test_copyright.py
+test/test_flake8.py
+test/test_pep257.py
