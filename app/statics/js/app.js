@@ -263,6 +263,50 @@ function estimatedBase(state) {
   return matrix(amcl.pose.pose.position, amcl.pose.pose.orientation);
 }
 
+// ALL 화면은 Robot 1의 지도만 표시하므로 Robot 2의 map 좌표를 Robot 1의
+// map 좌표로 옮겨야 한다. 동일한 점유 격자를 서로 다른 origin으로 발행하는
+// 경우의 변환은 origin(R1) * inverse(origin(R2)) 이다.
+function mapCenterMatrix(state) {
+  const message = state.messages.map,
+    origin = state.messages.mapOrigin;
+  if (!message || !origin) return null;
+  return origin.clone().multiply(new T.Matrix4().makeTranslation(
+    message.info.width * message.info.resolution / 2,
+    message.info.height * message.info.resolution / 2,
+    0
+  ));
+}
+
+function allMapAlignment(state) {
+  if (selectedMode !== 'all' || state.index === 0) return new T.Matrix4();
+  const referenceCenter = mapCenterMatrix(robotStates[0]),
+    currentCenter = mapCenterMatrix(state);
+  if (!referenceCenter || !currentCenter) return new T.Matrix4();
+  // 서로 다른 크기로 잘린 지도도 중심과 방향을 일치시켜 같은 웹 원점에 표시한다.
+  return referenceCenter.multiply(currentCenter.invert());
+}
+
+function viewCentering(state) {
+  const reference = selectedMode === 'all' ? robotStates[0] : state,
+    message = reference.messages.map,
+    origin = reference.messages.mapOrigin;
+  if (!message || !origin) return new T.Matrix4();
+  const tf = transform(reference, message.header?.frame_id);
+  if (!tf) return new T.Matrix4();
+  const center = new T.Vector3(
+    message.info.width * message.info.resolution / 2,
+    message.info.height * message.info.resolution / 2,
+    0
+  ).applyMatrix4(origin).applyMatrix4(tf);
+  return new T.Matrix4().makeTranslation(-center.x, -center.y, -center.z);
+}
+
+function displayMatrix(state, value) {
+  const aligned = selectedMode === 'all' ? allMapAlignment(state).multiply(value.clone()) : value
+    .clone();
+  return viewCentering(state).multiply(aligned);
+}
+
 function showMap(state, message) {
   if (!message.info || message.info.width * message.info.height !== message.data?.length || message
     .data.length > 16777216) throw Error('지도 크기/데이터가 유효하지 않습니다.');
@@ -417,6 +461,23 @@ function resetState(state, {
   state.status = '연결 대기';
 }
 
+function clearLiveDisplay(state) {
+  for (const key of ['amcl', 'odom', 'path', 'scan', 'tf', 'static', 'camera',
+    'platformCamera']) {
+    delete state.messages[key];
+    delete state.last[key];
+  }
+  state.transforms.clear();
+  geometry(state.pathLine, []);
+  geometry(state.scanPoints, []);
+  state.groups.robot.visible = false;
+  state.groups.path.visible = false;
+  state.groups.scan.visible = false;
+  disposeGroup(state.groups.tf);
+  state.cameraUrl = '';
+  renderCameras();
+}
+
 function closeState(state, {
   closeNavigation = true
 } = {}) {
@@ -476,6 +537,7 @@ function connectState(state) {
       },
       close() {
         if (token !== state.epoch) return;
+        clearLiveDisplay(state);
         state.navigationStateKnown = false;
         state.status = '연결 끊김';
         navigationReport(`${robotName(state.index)} 플랫폼 연결 끊김`);
@@ -637,7 +699,8 @@ function fit() {
   const tf = transform(state, message.header.frame_id);
   if (!tf) return;
   const center = new T.Vector3(message.info.width * message.info.resolution / 2, message.info
-      .height * message.info.resolution / 2, 0).applyMatrix4(state.messages.mapOrigin).applyMatrix4(tf),
+      .height * message.info.resolution / 2, 0).applyMatrix4(state.messages.mapOrigin).applyMatrix4(tf)
+    .applyMatrix4(viewCentering(state)),
     span = Math.max(message.info.width, message.info.height) * message.info.resolution;
   controls.target.copy(center);
   camera.position.copy(center).add(new T.Vector3(0, -.01, Math.max(span * 1.4, 3)));
@@ -781,17 +844,18 @@ function mapPoint(event, validate = true) {
 }
 
 function setDestination(point, yaw = 0, headingSet = false) {
-  const state = primaryState();
+  const state = primaryState(),
+    rosPoint = point.clone().applyMatrix4(viewCentering(state).invert());
   goal = {
     kind: selectionKind,
     headingSet,
-    x: point.x,
-    y: point.y,
-    z: point.z + .025,
+    x: rosPoint.x,
+    y: rosPoint.y,
+    z: rosPoint.z + .025,
     yaw,
     frame: normalize(profiles[state.index].fixed)
   };
-  goalMarker.position.set(goal.x, goal.y, goal.z + .06);
+  goalMarker.position.set(point.x, point.y, point.z + .085);
   goalMarker.rotation.z = yaw;
   goalMarker.visible = true;
   const color = selectionKind === 'initial' ? 0xffb347 : 0x39dfbd;
@@ -988,17 +1052,14 @@ function mapsMatch() {
     oa = ia.origin,
     ob = ib.origin,
     close = (x, y) => Math.abs(x - y) < 1e-5,
-    same = ia.width === ib.width && ia.height === ib.height && close(ia.resolution, ib
-      .resolution) && ['x', 'y', 'z'].every(k => close(oa.position[k], ob.position[k])) && ['x',
-      'y',
-      'z', 'w'
-    ].every(k => close(oa.orientation[k], ob.orientation[k]));
-  return same ? {
+    sameGrid = ia.width === ib.width && ia.height === ib.height && close(ia.resolution, ib
+      .resolution),
+    sameOrigin = ['x', 'y', 'z'].every(k => close(oa.position[k], ob.position[k])) && ['x', 'y',
+      'z', 'w'].every(k => close(oa.orientation[k], ob.orientation[k]));
+  return {
     ok: true,
-    text: `공통 /${frameA} 좌표계 · 지도 메타데이터 일치`
-  } : {
-    ok: false,
-    text: `/${frameA} 이름은 같지만 지도 원점/크기가 다릅니다.`
+    text: sameGrid && sameOrigin ? `공통 /${frameA} 좌표계 · 지도 메타데이터 일치` :
+      `공통 /${frameA} 좌표계 · Robot 1·2 지도 중심 정렬`
   };
 }
 
@@ -1059,7 +1120,7 @@ function updateDashboard() {
     position = state => {
       const base = estimatedBase(state);
       if (!base) return '—';
-      const value = new T.Vector3().setFromMatrixPosition(base);
+      const value = new T.Vector3().setFromMatrixPosition(displayMatrix(state, base));
       return `${value.x.toFixed(2)}, ${value.y.toFixed(2)}`;
     };
   $('speed').textContent = states.map(state => `${all?`R${state.index+1} `:''}${speed(state)}`)
@@ -1123,8 +1184,10 @@ function animate(now) {
         fresh = key !== 'scan' || Date.now() - (state.last.scan || 0) < 3000;
       state.groups[key].visible = !!(enabled[key] && tf && fresh && !(all && key === 'map' && state
         .index === 1 && robotStates[0].messages.map));
-      if (tf) place(state.groups[key], key === 'map' ? tf.clone().multiply(state.messages
-        .mapOrigin) : tf);
+      if (tf) {
+        const value = key === 'map' ? tf.clone().multiply(state.messages.mapOrigin) : tf;
+        place(state.groups[key], displayMatrix(state, value));
+      }
     }
     if (!state.mapFitted && state.messages.map && state.index === active[0]) fit();
     const base = estimatedBase(state);
@@ -1137,9 +1200,9 @@ function animate(now) {
         for (const link of state.modelLinks) {
           const mat = modelTransform(link.frame, lookup, state.modelJoints);
           link.group.visible = !!mat;
-          if (mat) place(link.group, mat);
+          if (mat) place(link.group, displayMatrix(state, mat));
         }
-      } else place(state.groups.robot, base);
+      } else place(state.groups.robot, displayMatrix(state, base));
     }
     if (now - (state.lastTfRender || 0) > 500) {
       state.lastTfRender = now;
@@ -1149,7 +1212,7 @@ function animate(now) {
           const mat = transform(state, frame);
           if (mat) {
             const axes = new T.AxesHelper(.3);
-            place(axes, mat);
+            place(axes, displayMatrix(state, mat));
             state.groups.tf.add(axes);
           }
         }

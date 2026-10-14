@@ -1,0 +1,4 @@
+1790907923.8104250 [INFO] [launch]: All log files can be found below /home/hkit/Future_drive_E/app/log/2026-10-02-11-25-23-809556-hkit-H510M-H-73415
+1790907923.8105392 [INFO] [launch]: Default logging verbosity is set to INFO
+1790907923.9603176 [INFO] [rosbridge_websocket-1]: process started with pid [73428]
+1790907923.9604366 [INFO] [rosapi_node-2]: process started with pid [73430]

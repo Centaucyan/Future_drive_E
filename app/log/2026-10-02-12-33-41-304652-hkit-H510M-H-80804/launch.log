@@ -1,0 +1,8 @@
+1790912021.3054016 [INFO] [launch]: All log files can be found below /home/hkit/Future_drive_E/app/log/2026-10-02-12-33-41-304652-hkit-H510M-H-80804
+1790912021.3055019 [INFO] [launch]: Default logging verbosity is set to INFO
+1790912021.4608922 [INFO] [rosbridge_websocket-1]: process started with pid [80823]
+1790912021.4610305 [INFO] [rosapi_node-2]: process started with pid [80825]
+1790912965.4702113 [WARNING] [launch]: user interrupted with ctrl-c (SIGINT)
+1790912965.4713695 [rosapi_node-2] Exiting due to SIGINT
+1790912965.6218302 [INFO] [rosapi_node-2]: process has finished cleanly [pid 80825]
+1790912965.6422260 [INFO] [rosbridge_websocket-1]: process has finished cleanly [pid 80823]

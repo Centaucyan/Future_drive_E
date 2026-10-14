@@ -1,0 +1,57 @@
+[INFO] [1790912021.801774306] [rosbridge_websocket]: Rosbridge WebSocket server started on port 9090
+[INFO] [1790912269.922177642] [rosbridge_websocket]: Calling services in new thread
+[INFO] [1790912269.922614788] [rosbridge_websocket]: Sending action goals in new thread
+[INFO] [1790912269.923225854] [rosbridge_websocket]: Client connected. 1 clients total.
+[INFO] [1790912269.934276824] [rosbridge_websocket]: Calling services in new thread
+[INFO] [1790912269.936112424] [rosbridge_websocket]: Sending action goals in new thread
+[INFO] [1790912269.936976217] [rosbridge_websocket]: Client connected. 2 clients total.
+[INFO] [1790912269.963470719] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /map
+[INFO] [1790912269.992492208] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /scan
+[INFO] [1790912269.993649739] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /plan
+[INFO] [1790912269.994835693] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /odom
+[INFO] [1790912269.999086503] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /tf
+[INFO] [1790912270.000000679] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /tf_static
+[INFO] [1790912270.000927637] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /image_raw/compressed
+[INFO] [1790912270.001796933] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /robot_description
+[INFO] [1790912270.002626961] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /amcl_pose
+[INFO] [1790912270.003599329] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Subscribed to /battery
+[INFO] [1790912318.770177598] [rosbridge_websocket]: Client disconnected. 1 clients total.
+[INFO] [1790912318.770411438] [rosbridge_websocket]: [Client da3e0e9c-4a51-44af-97b7-ec785b86779c] Unsubscribed from /map
+[INFO] [1790912318.772788343] [rosbridge_websocket]: Client disconnected. 0 clients total.
+[INFO] [1790912324.765734079] [rosbridge_websocket]: Calling services in new thread
+[INFO] [1790912324.766219107] [rosbridge_websocket]: Sending action goals in new thread
+[INFO] [1790912324.767085566] [rosbridge_websocket]: Client connected. 1 clients total.
+[INFO] [1790912324.769309959] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /map
+[INFO] [1790912324.770116322] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /scan
+[INFO] [1790912324.770866666] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /plan
+[INFO] [1790912324.771765789] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /odom
+[INFO] [1790912324.772544172] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /tf
+[INFO] [1790912324.773338751] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /tf_static
+[INFO] [1790912324.774099006] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /image_raw/compressed
+[INFO] [1790912324.774974803] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /robot_description
+[INFO] [1790912324.775872986] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /amcl_pose
+[INFO] [1790912324.777705526] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Subscribed to /battery
+[INFO] [1790912324.777868666] [rosbridge_websocket]: Calling services in new thread
+[INFO] [1790912324.778262420] [rosbridge_websocket]: Sending action goals in new thread
+[INFO] [1790912324.778822540] [rosbridge_websocket]: Client connected. 2 clients total.
+[INFO] [1790912325.603986488] [rosbridge_websocket]: [Client 38c51d75-abdb-435a-8f95-85037c9eb578] Unsubscribed from /map
+[INFO] [1790912325.605881598] [rosbridge_websocket]: Client disconnected. 1 clients total.
+[INFO] [1790912325.606718827] [rosbridge_websocket]: Client disconnected. 0 clients total.
+[INFO] [1790912327.723461331] [rosbridge_websocket]: Calling services in new thread
+[INFO] [1790912327.723760993] [rosbridge_websocket]: Sending action goals in new thread
+[INFO] [1790912327.724339973] [rosbridge_websocket]: Client connected. 1 clients total.
+[INFO] [1790912327.733222188] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /map
+[INFO] [1790912327.734078514] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /scan
+[INFO] [1790912327.735064666] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /plan
+[INFO] [1790912327.735837542] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /odom
+[INFO] [1790912327.737211387] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /tf
+[INFO] [1790912327.738286915] [rosbridge_websocket]: Calling services in new thread
+[INFO] [1790912327.738638370] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /tf_static
+[INFO] [1790912327.738902621] [rosbridge_websocket]: Sending action goals in new thread
+[INFO] [1790912327.740021583] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /image_raw/compressed
+[INFO] [1790912327.740946349] [rosbridge_websocket]: Client connected. 2 clients total.
+[INFO] [1790912327.741319286] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /robot_description
+[INFO] [1790912327.742116750] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /amcl_pose
+[INFO] [1790912327.743072229] [rosbridge_websocket]: [Client 449e5ae4-3a85-4c48-82fc-01c14fd51b14] Subscribed to /battery
+[INFO] [1790912362.179667590] [rosbridge_websocket]: Client disconnected. 1 clients total.
+[INFO] [1790912362.180456450] [rosbridge_websocket]: Client disconnected. 0 clients total.
