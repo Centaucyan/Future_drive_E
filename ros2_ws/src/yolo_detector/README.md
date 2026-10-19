@@ -8,23 +8,23 @@
 ## 📐 시스템 아키텍처
 
 ```
-┌──────────────────┐     /camera/image_raw      ┌──────────────────┐
+┌──────────────────┐     /image_raw/compressed   ┌──────────────────┐
 │                  │  ─────────────────────────▶ │                  │
-│  camera_node     │    (sensor_msgs/Image)      │   yolo_node      │
+│  camera_node     │(sensor_msgs/CompressedImage)│   lidar_yahboom  │
 │  (카메라/영상)    │                             │  (YOLO 객체검출)  │
 └──────────────────┘                             └────────┬─────────┘
                                                           │
-                                          ┌───────────────┼──────────────────┐
-                                          │               │                  │
-                                          ▼               ▼                  ▼
-                                 /yolo/detections  /yolo/detections_json  /yolo/result_image
-                                 (Detection2DArray)  (String/JSON)       (sensor_msgs/Image)
-                                                          │                  │
-                                                          ▼                  ▼
-                                                   ┌──────────────────────────┐
-                                                   │   visualization_node     │
-                                                   │  (결과 시각화 + 로그)     │
-                                                   └──────────────────────────┘
+                                          ┌───────────────┼──────────────────┐─────────────────────┐
+                                          │               │                  │                     │
+                                                               ▼                      ▼                          ▼                               ▼
+                                 /yolo/detections  /yolo/detections_json  /yolo/result_image  /yolo/result_image/compressed
+                                 (Detection2DArray)  (String/JSON)       (sensor_msgs/Image)      (sensor_msgs/CompressedImage)
+                                                          │                  │                     │
+                                                                                       ▼                          ▼                               ▼
+                                                   ┌──────────────────────────┐            ┌────────────────┐    
+                                                   │   visualization_node     │            │     AP_Web     │
+                                                   │  (결과 시각화 + 로그)     │             │                │
+                                                   └──────────────────────────┘            └────────────────┘
 ```
 
 ---
